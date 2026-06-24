@@ -1,0 +1,66 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body, #root {
+    height: 100%;
+    width: 100%;
+    overflow: hidden;
+    font-family: 'Inter', system-ui, sans-serif;
+}
+
+[data-theme="light"] { color-scheme: light; }
+[data-theme="dark"] { color-scheme: dark; }
+
+.scrollbar-thin::-webkit-scrollbar { width: 6px; }
+.scrollbar-thin::-webkit-scrollbar-thumb {
+    background: rgba(115, 115, 115, 0.4);
+    border-radius: 3px;
+}
+
+.topology-canvas-dark .react-flow__background pattern line,
+.topology-canvas-dark .react-flow__background pattern path {
+    stroke: rgba(255, 255, 255, 0.05) !important;
+}
+
+.topology-canvas-light .react-flow__background pattern line,
+.topology-canvas-light .react-flow__background pattern path {
+    stroke: rgba(0, 0, 0, 0.07) !important;
+}
+
+.react-flow__edge-path {
+    stroke-width: 2.5 !important;
+}
+
+.react-flow__edge.animated .react-flow__edge-path {
+    stroke-dasharray: 10 6;
+    animation: edge-flow 1.6s linear infinite;
+}
+
+@keyframes edge-flow {
+    to { stroke-dashoffset: -32; }
+}
+
+.react-flow__controls {
+    border-radius: 8px !important;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.2) !important;
+    border: 1px solid #404040 !important;
+}
+
+[data-theme="dark"] .react-flow__controls button {
+    background: #262626 !important;
+    border-color: #404040 !important;
+    color: #d4d4d4 !important;
+}
+
+[data-theme="light"] .react-flow__controls button {
+    background: #ffffff !important;
+    border-color: #d4d4d4 !important;
+    color: #404040 !important;
+}
+
+.react-flow__minimap { border-radius: 8px !important; }

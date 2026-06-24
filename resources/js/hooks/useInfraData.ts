@@ -1,0 +1,198 @@
+import { useState, useEffect, useCallback } from 'react';
+import {
+    api,
+    mockServers,
+    mockAlerts,
+    mockMetrics,
+    mockTopologies,
+    buildMockTopology,
+    mockApi,
+} from '../lib/api';
+import type { Server, Alert, ServerMetrics, TopologyLayout, TopologyDashboard } from '../types';
+
+export const USE_MOCK = import.meta.env.VITE_USE_MOCK === 'true';
+const POLL_INTERVAL = 5000;
+
+export function useServers(filters?: { status?: string; search?: string }) {
+    const [servers, setServers] = useState<Server[]>([]);
+    const [loading, setLoading] = useState(true);
+
+    const fetchServers = useCallback(async () => {
+        try {
+            if (USE_MOCK) {
+                let data = [...mockServers];
+                if (filters?.status) data = data.filter((s) => s.status === filters.status);
+                if (filters?.search) {
+                    const q = filters.search.toLowerCase();
+                    data = data.filter(
+                        (s) =>
+                            s.name.toLowerCase().includes(q) ||
+                            s.ip.includes(q) ||
+                            s.instance.includes(q)
+                    );
+                }
+                setServers(data);
+            } else {
+                const data = await api.getServers(filters);
+                setServers(Array.isArray(data) ? data : []);
+            }
+        } finally {
+            setLoading(false);
+        }
+    }, [JSON.stringify(filters)]);
+
+    useEffect(() => {
+        fetchServers();
+        if (!USE_MOCK) {
+            const interval = setInterval(fetchServers, POLL_INTERVAL);
+            return () => clearInterval(interval);
+        }
+    }, [fetchServers]);
+
+    return { servers, loading, refresh: fetchServers };
+}
+
+export function useAlerts() {
+    const [alerts, setAlerts] = useState<Alert[]>([]);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        if (USE_MOCK) {
+            setAlerts(mockAlerts);
+            setLoading(false);
+            return;
+        }
+        const load = async () => {
+            try {
+                const data = await api.getAlerts();
+                setAlerts(Array.isArray(data) ? data : []);
+            } finally {
+                setLoading(false);
+            }
+        };
+        load();
+        const interval = setInterval(load, POLL_INTERVAL);
+        return () => clearInterval(interval);
+    }, []);
+
+    return { alerts, loading };
+}
+
+export function useServerMetrics(serverId: string | null) {
+    const [metrics, setMetrics] = useState<ServerMetrics | null>(null);
+    const [loading, setLoading] = useState(false);
+
+    useEffect(() => {
+        if (!serverId) return;
+        setLoading(true);
+        if (USE_MOCK) {
+            const server = mockServers.find((s) => s.id === serverId);
+            if (server) setMetrics(mockMetrics(server));
+            setLoading(false);
+            return;
+        }
+        const load = async () => {
+            try {
+                const data = await api.getServerMetrics(serverId);
+                setMetrics(data as ServerMetrics);
+            } finally {
+                setLoading(false);
+            }
+        };
+        load();
+        const interval = setInterval(load, POLL_INTERVAL);
+        return () => clearInterval(interval);
+    }, [serverId]);
+
+    return { metrics, loading };
+}
+
+export function useTopologies() {
+    const [topologies, setTopologies] = useState<TopologyDashboard[]>([]);
+    const [loading, setLoading] = useState(true);
+
+    const refresh = useCallback(async () => {
+        try {
+            if (USE_MOCK) {
+                setTopologies(mockTopologies);
+            } else {
+                const data = await api.listTopologies();
+                setTopologies(Array.isArray(data) ? data : []);
+            }
+        } finally {
+            setLoading(false);
+        }
+    }, []);
+
+    useEffect(() => { refresh(); }, [refresh]);
+
+    const createTopology = useCallback(async (name: string, description?: string) => {
+        if (USE_MOCK) {
+            const newT: TopologyDashboard = {
+                id: Date.now(), name, description, is_default: false,
+                sort_order: mockTopologies.length, node_count: 0, edge_count: 0,
+            };
+            mockTopologies.push(newT);
+            await refresh();
+            return newT;
+        }
+        const created = await api.createTopology({ name, description });
+        await refresh();
+        return created;
+    }, [refresh]);
+
+    const deleteTopology = useCallback(async (id: number) => {
+        if (!USE_MOCK) await api.deleteTopology(id);
+        await refresh();
+    }, [refresh]);
+
+    return { topologies, loading, refresh, createTopology, deleteTopology };
+}
+
+export function useTopology(topologyId: number | null) {
+    const [topology, setTopology] = useState<TopologyLayout | null>(null);
+    const [loading, setLoading] = useState(true);
+    const [saveError, setSaveError] = useState<string | null>(null);
+    const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
+
+    const load = useCallback(async () => {
+        if (!topologyId) return;
+        setLoading(true);
+        try {
+            if (USE_MOCK) {
+                setTopology(mockApi.getStoredTopology(topologyId));
+            } else {
+                const data = await api.getTopology(topologyId);
+                setTopology(data as TopologyLayout);
+            }
+        } catch {
+            setTopology(buildMockTopology(topologyId));
+        } finally {
+            setLoading(false);
+        }
+    }, [topologyId]);
+
+    useEffect(() => { load(); }, [load]);
+
+    const saveTopology = useCallback(
+        async (layout: Omit<TopologyLayout, 'topology' | 'links'>, action = 'auto_save') => {
+            if (!topologyId) return false;
+            setSaveError(null);
+            try {
+                if (USE_MOCK) {
+                    await mockApi.saveTopology(topologyId, layout);
+                } else {
+                    await api.saveTopology(topologyId, { ...layout, action });
+                }
+                setLastSavedAt(new Date());
+                return true;
+            } catch (e) {
+                setSaveError(e instanceof Error ? e.message : 'Save failed');
+                return false;
+            }
+        },
+        [topologyId]
+    );
+
+    return { topology, loading, saveTopology, saveError, lastSavedAt, reload: load };
+}
