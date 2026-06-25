@@ -31,7 +31,7 @@ const NODE_TYPES = { infraNode: InfraNode };
 function edgeStroke(sourceStatus?: string, targetStatus?: string, isDark?: boolean): string {
     if (sourceStatus === 'down' || targetStatus === 'down') return '#dc2626';
     if (sourceStatus === 'warning' || targetStatus === 'warning') return '#ca8a04';
-    return isDark ? '#525252' : '#737373';
+    return isDark ? '#10b981' : '#059669';
 }
 
 function buildEdge(e: TopologyLayout['edges'][0], isDark: boolean, nodeMap: Map<string, Server>): Edge {
@@ -44,8 +44,8 @@ function buildEdge(e: TopologyLayout['edges'][0], isDark: boolean, nodeMap: Map<
         ...e,
         sourceHandle: e.sourceHandle,
         targetHandle: e.targetHandle,
-        animated: !isBad,
-        style: { stroke, strokeWidth: isBad ? 3 : 2.5, opacity: isBad ? 1 : 0.85 },
+        animated: true,
+        style: { stroke, strokeWidth: isBad ? 3 : 2.5, opacity: isBad ? 0.9 : 0.85 },
         markerEnd: {
             type: MarkerType.ArrowClosed,
             color: stroke,
@@ -245,15 +245,12 @@ function TopologyCanvasInner({ topologyId, onNodeClick, liveServers, allServers 
                 nodes={nodeStatuses}
                 onFilterStatus={setStatusFilter}
                 activeFilter={statusFilter}
+                allServers={allServers}
+                canvasServerIds={canvasServerIds}
+                onAddServer={handleAddServer}
             />
 
             <div className="flex-1 relative min-h-0">
-                <CenterSearchBar
-                    allServers={allServers}
-                    canvasServerIds={canvasServerIds}
-                    onAdd={handleAddServer}
-                />
-
                 <ReactFlow
                     nodes={visibleNodes}
                     edges={edges}

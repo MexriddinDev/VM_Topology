@@ -9,7 +9,7 @@ interface Props {
     onAdd: (server: Server) => void;
 }
 
-export default function CenterSearchBar({ allServers, canvasServerIds, onAdd }: Props) {
+export default function TopologySearchHeader({ allServers, canvasServerIds, onAdd }: Props) {
     const { isDark } = useTheme();
     const [query, setQuery] = useState('');
     const [open, setOpen] = useState(false);
@@ -48,10 +48,14 @@ export default function CenterSearchBar({ allServers, canvasServerIds, onAdd }: 
         : 'bg-white border-slate-200 shadow-xl';
 
     return (
-        <div ref={ref} className="absolute top-0 left-0 right-0 z-30 px-6 py-3.5 flex items-center gap-3 flex-shrink-0 border-b" style={{
+        <div ref={ref} className="flex-1 relative px-6 py-3 flex items-center gap-3 flex-shrink-0 border-b" style={{
             background: isDark ? '#0f1419' : '#f8f9fa',
             borderColor: isDark ? '#1e2330' : '#e5e7eb'
         }}>
+            <span className={`text-xs font-bold uppercase tracking-widest flex-shrink-0 ${isDark ? 'text-white/40' : 'text-gray-400'}`}>
+                Status
+            </span>
+
             <div className="flex-1 max-w-md relative">
                 <div className={`flex items-center gap-3 px-4 py-2.5 rounded-lg border-2 ${inputCls}`}>
                     <Search size={18} className="flex-shrink-0 opacity-50" />

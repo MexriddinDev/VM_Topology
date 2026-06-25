@@ -23,7 +23,7 @@ const STATUS: Record<string, {
         accent:    '#22c55e',
         accentDim: '#22c55e22',
         accentGlow:'#22c55e55',
-        label:     'ONLINE',
+        label:     'UP',
         dotPulse:  true,
     },
     warning: {
@@ -34,10 +34,10 @@ const STATUS: Record<string, {
         dotPulse:  false,
     },
     down: {
-        accent:    '#ef4444',
+        accent:    '#C72F12',
         accentDim: '#ef444418',
-        accentGlow:'#ef444422',
-        label:     'OFFLINE',
+        accentGlow:'#C72F12',
+        label:     'DOWN',
         dotPulse:  false,
     },
     unknown: {
