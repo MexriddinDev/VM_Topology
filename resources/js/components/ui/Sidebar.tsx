@@ -13,7 +13,6 @@ interface Props {
     page: Page;
     setPage: (page: Page) => void;
     alertCount: number;
-    isDark?: boolean;
 }
 
 const items = [
@@ -38,20 +37,9 @@ export default function Sidebar({
                                     page,
                                     setPage,
                                     alertCount,
-                                    isDark = true,
                                 }: Props) {
-    const bgClass = isDark ? 'bg-[#070B13]' : 'bg-gray-100';
-    const borderClass = isDark ? 'border-slate-800' : 'border-gray-200';
-    const hoverBgClass = isDark ? 'bg-[#1B2638]' : 'bg-gray-200';
-    const textClass = isDark ? 'text-slate-400' : 'text-gray-600';
-    const textHoverClass = isDark ? 'group-hover:text-indigo-400' : 'group-hover:text-indigo-600';
-    const inactiveBgClass = isDark ? 'bg-[#111827]' : 'bg-gray-200';
-    const activeBgClass = isDark
-        ? 'bg-gradient-to-br from-indigo-500 to-indigo-700 shadow-[0_0_20px_rgba(99,102,241,.35)]'
-        : 'bg-gradient-to-br from-indigo-400 to-indigo-600 shadow-[0_0_20px_rgba(99,102,241,.25)]';
-
     return (
-        <aside className={`w-16 h-screen ${bgClass} border-r ${borderClass} flex flex-col justify-between`}>
+        <aside className="w-16 h-screen bg-[#070B13] border-r border-slate-800 flex flex-col justify-between">
 
             {/* Logo */}
             <div>
@@ -59,7 +47,7 @@ export default function Sidebar({
                     <motion.div
                         whileHover={{ rotate: 180 }}
                         transition={{ duration: 0.45 }}
-                        className="w-11 h-11 rounded-xl bg-gradient-to-br from-indigo-500 to-indigo-700 flex items-center justify-center shadow-[0_0_18px_rgba(99,102,241,.4)]"
+                        className="w-11 h-11 rounded-xl bg-gradient-to-br from-cyan-500 to-blue-700 flex items-center justify-center shadow-[0_0_18px_rgba(56,189,248,.4)]"
                     >
                         <ShieldCheck
                             size={22}
@@ -86,23 +74,23 @@ export default function Sidebar({
                                 {active && (
                                     <motion.div
                                         layoutId="sidebar-indicator"
-                                        className={`absolute left-0 top-2 bottom-2 w-1 rounded-r-full ${isDark ? 'bg-indigo-400' : 'bg-indigo-500'}`}
+                                        className="absolute left-0 top-2 bottom-2 w-1 rounded-r-full bg-cyan-400"
                                     />
                                 )}
 
                                 <div
                                     className={`relative w-11 h-11 rounded-xl flex items-center justify-center transition-all duration-300 ${
                                         active
-                                            ? activeBgClass
-                                            : inactiveBgClass
-                                    } ${!active && (isDark ? 'group-hover:bg-[#1B2638]' : 'group-hover:bg-gray-200')}`}
+                                            ? "bg-gradient-to-br from-cyan-500 to-blue-700 shadow-[0_0_20px_rgba(56,189,248,.35)]"
+                                            : "bg-[#111827] group-hover:bg-[#1B2638]"
+                                    }`}
                                 >
                                     <Icon
                                         size={20}
                                         className={
                                             active
                                                 ? "text-white"
-                                                : `${textClass} ${textHoverClass}`
+                                                : "text-slate-400 group-hover:text-cyan-300"
                                         }
                                     />
 
@@ -129,10 +117,10 @@ export default function Sidebar({
             <div className="pb-5 space-y-3">
 
                 <button className="w-full flex justify-center group">
-                    <div className={`w-11 h-11 rounded-xl ${inactiveBgClass} ${isDark ? 'group-hover:bg-[#1B2638]' : 'group-hover:bg-gray-200'} flex items-center justify-center transition-all`}>
+                    <div className="w-11 h-11 rounded-xl bg-[#111827] group-hover:bg-[#1B2638] flex items-center justify-center transition-all">
                         <Settings
                             size={20}
-                            className={`${textClass} ${textHoverClass}`}
+                            className="text-slate-400 group-hover:text-cyan-300"
                         />
                     </div>
                 </button>
@@ -141,7 +129,7 @@ export default function Sidebar({
                     <img
                         src="https://i.pravatar.cc/150"
                         alt="User"
-                        className={`w-9 h-9 rounded-full border-2 ${isDark ? 'border-indigo-500' : 'border-indigo-400'} shadow-md`}
+                        className="w-9 h-9 rounded-full border-2 border-cyan-500 shadow-md"
                     />
                 </button>
 

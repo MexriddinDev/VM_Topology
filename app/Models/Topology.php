@@ -4,14 +4,12 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Topology extends Model
 {
     protected $fillable = [
         'name',
         'description',
-        'user_id',
         'viewport_x',
         'viewport_y',
         'viewport_zoom',
@@ -26,11 +24,6 @@ class Topology extends Model
         'is_default'    => 'boolean',
         'sort_order'    => 'integer',
     ];
-
-    public function user(): BelongsTo
-    {
-        return $this->belongsTo(User::class);
-    }
 
     public function nodes(): HasMany
     {

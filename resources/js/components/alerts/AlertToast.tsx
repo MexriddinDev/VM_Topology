@@ -41,32 +41,29 @@ export default function AlertToast({ alerts }: Props) {
 
     const getStyle = (severity: string) => ({
         critical: {
-            bg: 'rgba(239,68,68,0.08)',
-            border: 'rgba(239,68,68,0.25)',
-            glow: 'none',
-            icon: <XCircle size={16} className="text-red-500 flex-shrink-0" />,
+            bg: 'rgba(239,68,68,0.12)',
+            border: 'rgba(239,68,68,0.4)',
+            glow: '0 0 20px rgba(239,68,68,0.3)',
+            icon: <XCircle size={16} className="text-red-400 flex-shrink-0" />,
             accent: '#ef4444',
-            textColor: 'text-white/75',
         },
         warning: {
-            bg: 'rgba(245,158,11,0.08)',
-            border: 'rgba(245,158,11,0.25)',
-            glow: 'none',
-            icon: <AlertTriangle size={16} className="text-amber-500 flex-shrink-0" />,
+            bg: 'rgba(245,158,11,0.12)',
+            border: 'rgba(245,158,11,0.4)',
+            glow: '0 0 20px rgba(245,158,11,0.2)',
+            icon: <AlertTriangle size={16} className="text-yellow-400 flex-shrink-0" />,
             accent: '#f59e0b',
-            textColor: 'text-white/75',
         },
         info: {
-            bg: 'rgba(59,130,246,0.08)',
-            border: 'rgba(59,130,246,0.25)',
+            bg: 'rgba(59,130,246,0.12)',
+            border: 'rgba(59,130,246,0.4)',
             glow: 'none',
-            icon: <Info size={16} className="text-blue-500 flex-shrink-0" />,
+            icon: <Info size={16} className="text-blue-400 flex-shrink-0" />,
             accent: '#3b82f6',
-            textColor: 'text-white/75',
         },
     }[severity] ?? {
         bg: 'rgba(255,255,255,0.05)', border: 'rgba(255,255,255,0.1)', glow: 'none',
-        icon: <Info size={16} />, accent: '#fff', textColor: 'text-white/75',
+        icon: <Info size={16} />, accent: '#fff',
     });
 
     return (
@@ -94,8 +91,8 @@ export default function AlertToast({ alerts }: Props) {
                                 <div className="text-[10px] font-bold uppercase tracking-widest mb-0.5" style={{ color: style.accent }}>
                                     {toast.severity} · {toast.type.replace('_', ' ')}
                                 </div>
-                                <div className={`text-xs leading-snug ${style.textColor}`}>{toast.message}</div>
-                                <div className="text-[9px] text-white/40 mt-1 font-mono">{toast.instance}</div>
+                                <div className="text-xs text-white/80 leading-snug">{toast.message}</div>
+                                <div className="text-[9px] text-white/30 mt-1 font-mono">{toast.instance}</div>
                             </div>
                             <button
                                 onClick={() => dismiss(toast.toastId)}

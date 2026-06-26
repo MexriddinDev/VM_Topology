@@ -12,9 +12,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('topologies', function (Blueprint $table) {
-            if (!Schema::hasColumn('topologies', 'user_id')) {
-                $table->foreignId('user_id')->nullable()->constrained('users')->onDelete('cascade')->after('id');
-            }
+            //
         });
     }
 
@@ -24,10 +22,7 @@ return new class extends Migration
     public function down(): void
     {
         Schema::table('topologies', function (Blueprint $table) {
-            if (Schema::hasColumn('topologies', 'user_id')) {
-                $table->dropForeignKeyIfExists(['user_id']);
-                $table->dropColumn('user_id');
-            }
+            //
         });
     }
 };

@@ -11,20 +11,10 @@ return new class extends Migration
      */
     public function up(): void
     {
-        if (!Schema::hasTable('topology_edges')) {
-            Schema::create('topology_edges', function (Blueprint $table) {
-                $table->id();
-                $table->foreignId('topology_id')->constrained('topologies')->onDelete('cascade');
-                $table->foreignId('source_node_id')->constrained('topology_nodes')->onDelete('cascade');
-                $table->foreignId('target_node_id')->constrained('topology_nodes')->onDelete('cascade');
-                $table->string('source_handle')->nullable();
-                $table->string('target_handle')->nullable();
-                $table->timestamps();
-                
-                $table->unique(['topology_id', 'source_node_id', 'target_node_id']);
-                $table->index(['topology_id', 'source_node_id']);
-            });
-        }
+        Schema::create('topology_edges', function (Blueprint $table) {
+            $table->id();
+            $table->timestamps();
+        });
     }
 
     /**

@@ -48,13 +48,10 @@ export default function CenterSearchBar({ allServers, canvasServerIds, onAdd }: 
         : 'bg-white border-slate-200 shadow-xl';
 
     return (
-        <div ref={ref} className="absolute top-0 left-0 right-0 z-30 px-6 py-3.5 flex items-center gap-3 flex-shrink-0 border-b" style={{
-            background: isDark ? '#0f1419' : '#f8f9fa',
-            borderColor: isDark ? '#1e2330' : '#e5e7eb'
-        }}>
-            <div className="flex-1 max-w-md relative">
-                <div className={`flex items-center gap-3 px-4 py-2.5 rounded-lg border-2 ${inputCls}`}>
-                    <Search size={18} className="flex-shrink-0 opacity-50" />
+        <div ref={ref} className="absolute top-4 left-1/2 -translate-x-1/2 z-30 w-full max-w-xl px-4">
+            <div className="relative">
+                <div className={`flex items-center gap-3 px-5 py-3.5 rounded-2xl border-2 ${inputCls}`}>
+                    <Search size={20} className="flex-shrink-0 opacity-50" />
                     <input
                         value={query}
                         onChange={(e) => {
@@ -62,16 +59,16 @@ export default function CenterSearchBar({ allServers, canvasServerIds, onAdd }: 
                             setOpen(true);
                         }}
                         onFocus={() => setOpen(true)}
-                        placeholder="Search VM by name or IP to add..."
-                        className="flex-1 bg-transparent text-sm font-medium outline-none"
+                        placeholder="Search VM by name or IP to add to topology..."
+                        className="flex-1 bg-transparent text-base font-medium outline-none"
                     />
                 </div>
 
                 {open && query.trim().length >= 2 && (
-                    <div className={`absolute top-full left-0 right-0 mt-2 rounded-lg border overflow-hidden z-50 ${dropdownCls}`}>
+                    <div className={`absolute top-full left-0 right-0 mt-2 rounded-xl border overflow-hidden ${dropdownCls}`}>
                         {results.length === 0 ? (
-                            <div className={`px-4 py-4 text-center text-sm ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
-                                No matching VMs found
+                            <div className={`px-5 py-6 text-center text-sm ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                                No matching VMs found in Prometheus
                             </div>
                         ) : (
                             results.map((server) => (
@@ -83,31 +80,31 @@ export default function CenterSearchBar({ allServers, canvasServerIds, onAdd }: 
                                         setQuery('');
                                         setOpen(false);
                                     }}
-                                    className={`w-full flex items-center gap-3 px-4 py-3 text-left transition-colors ${
+                                    className={`w-full flex items-center gap-4 px-5 py-3.5 text-left transition-colors ${
                                         isDark ? 'hover:bg-slate-800/80 border-b border-slate-800' : 'hover:bg-slate-50 border-b border-slate-100'
                                     }`}
                                 >
-                                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${isDark ? 'bg-slate-800' : 'bg-slate-100'}`}>
-                                        <ServerIcon size={16} className={isDark ? 'text-slate-300' : 'text-slate-600'} />
+                                    <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${isDark ? 'bg-slate-800' : 'bg-slate-100'}`}>
+                                        <ServerIcon size={20} className={isDark ? 'text-slate-300' : 'text-slate-600'} />
                                     </div>
                                     <div className="flex-1 min-w-0">
-                                        <div className={`text-sm font-semibold truncate ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
+                                        <div className={`text-base font-semibold truncate ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
                                             {server.name}
                                         </div>
-                                        <div className={`text-xs font-mono ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                                        <div className={`text-sm font-mono ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
                                             {server.ip}
                                         </div>
                                     </div>
                                     <div className="flex items-center gap-2 flex-shrink-0">
                                         <span
-                                            className="w-2 h-2 rounded-full"
+                                            className="w-2.5 h-2.5 rounded-full"
                                             style={{
                                                 background:
                                                     server.status === 'healthy' ? '#059669' :
                                                     server.status === 'warning' ? '#d97706' : '#dc2626',
                                             }}
                                         />
-                                        <Plus size={16} className="text-emerald-600" />
+                                        <Plus size={18} className="text-emerald-600" />
                                     </div>
                                 </button>
                             ))
