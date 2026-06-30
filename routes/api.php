@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\PrometheusController;
 use App\Http\Controllers\ServerController;
 use App\Http\Controllers\TopologyController;
 use App\Http\Controllers\AlertController;
@@ -11,6 +12,9 @@ Route::prefix('v1')->middleware(['throttle:120,1'])->group(function () {
 
     Route::get('/topologies', [TopologyController::class, 'index']);
     Route::post('/topologies', [TopologyController::class, 'store']);
+
+
+    Route::get('/prometheus/targets', [PrometheusController::class, 'targets']);
 
     Route::get('/topology/{id?}', [TopologyController::class, 'show']);
     Route::put('/topology/{id}', [TopologyController::class, 'updateMeta']);

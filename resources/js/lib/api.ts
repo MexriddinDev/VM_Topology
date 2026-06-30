@@ -25,25 +25,43 @@ async function fetchJSON<T>(path: string, options?: RequestInit): Promise<T> {
     }
 
     const json = await res.json();
-    return json.data ?? json;
+
+    // ✅ universal normalize
+    return (json.data ?? json.result ?? json) as T;
 }
 
 // ─── API Client ───────────────────────────────────────────────────────────────
 
 export const api = {
     // Servers
-    getServers: (params?: { status?: string; search?: string }) => {
-        const qs = new URLSearchParams(
-            Object.fromEntries(
-                Object.entries(params ?? {}).filter(([, v]) => v !== undefined)
-            ) as Record<string, string>
-        ).toString();
-        return fetchJSON<Server[]>(`/servers${qs ? `?${qs}` : ''}`);
+    getServers: async (params?: { status?: string; search?: string }) => {
+        const qs = new URLSearchParams();
+
+        if (params?.status) qs.append('status', params.status);
+        if (params?.search) qs.append('search', params.search);
+
+        const data = await fetchJSON<any[]>(
+            `/servers${qs.toString() ? `?${qs.toString()}` : ''}`
+        );
+
+        return data.map((s: any) => ({
+            id: s.id,
+            name: s.name,
+            instance: s.instance ?? `${s.ip}:9100`,
+            job: s.job ?? 'node',
+            type: s.type ?? 'vm',
+            status: s.status === 'healthy' ? 'up' : 'down',
+
+            cpu_percent: s.cpu_percent ?? 0,
+            ram_percent: s.ram_percent ?? 0,
+
+            ip: s.ip,
+            port: s.port ?? 9100,
+            labels: s.labels ?? {},
+            layers: s.layers ?? ['infra'],
+            jobs: s.jobs ?? [],
+        }));
     },
-
-    getServer: (id: string) =>
-        fetchJSON<Server>(`/servers/${id}`),
-
     getServerMetrics: (id: string) =>
         fetchJSON<ServerMetrics>(`/server/${id}/metrics`),
 
@@ -171,18 +189,23 @@ function specToServer(spec: VmSpec): Server {
     const zone = spec.ip.split('.')[2];
 
     return {
-        id:          spec.id,
-        name:        spec.name,
-        instance:    `${spec.ip}:9100`,
-        job:         'node',
-        type:        'vm',
-        status:      spec.status,
+        id: spec.id,
+        name: spec.name,
+        instance: `${spec.ip}:9100`,
+        job: 'node',
+        type: 'vm',
+
+        // ✅ FIXED STATUS
+        status: spec.status === 'healthy' ? 'up' : 'down',
+
         cpu_percent: spec.cpu,
         ram_percent: spec.ram,
-        ip:          spec.ip,
-        port:        9100,
-        labels:      { zone },
-        layers:      spec.layers,
+        ip: spec.ip,
+        port: 9100,
+
+        labels: { zone },
+        layers: spec.layers,
+
         jobs: [
             'node',
             ...spec.layers
@@ -360,7 +383,7 @@ export function buildMockTopology(topologyId = 1): TopologyLayout {
 export function mockMetrics(server: Server): ServerMetrics {
     const layers  = server.layers ?? ['infra'];
     const alive   = server.status !== 'down';
-    const warning = server.status === 'warning';
+
 
     const GB = 1024 ** 3;
     const MB = 1024 ** 2;
@@ -389,7 +412,7 @@ export function mockMetrics(server: Server): ServerMetrics {
                 latency_p50_ms:   alive ? 12.4  : 0,
                 latency_p95_ms:   alive ? 87.2  : 0,
                 latency_p99_ms:   alive ? 234.5 : 0,
-                error_rate_5xx:   alive ? (warning ? 2.4 : 0.3) : 100,
+                error_rate_5xx:   alive ? 0.3 : 100,
                 errors_4xx_sec:   alive ? 3.2 : 0,
             }
             : null,
@@ -399,10 +422,9 @@ export function mockMetrics(server: Server): ServerMetrics {
                 connections:       alive ? 47 : 0,
                 up:                alive,
                 max_query_duration: alive ? 0.043 : 0,
-                slow_queries:      alive ? (warning ? 8 : 1) : 0,
+                slow_queries:      alive ? 1 : 0,
             }
             : null,
-
         redis: layers.includes('redis')
             ? {
                 up:            alive,

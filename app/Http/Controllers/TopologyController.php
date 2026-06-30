@@ -7,7 +7,8 @@ use App\Services\PrometheusService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
-class TopologyController extends Controller
+class
+TopologyController extends Controller
 {
     public function __construct(
         private TopologyService $topology,

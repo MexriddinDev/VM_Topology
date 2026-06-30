@@ -1,6 +1,6 @@
 export type NodeType = 'vm';
 
-export type NodeStatus = 'healthy' | 'warning' | 'down' | 'unknown';
+export type NodeStatus = 'up' |  'down' ;
 
 export type AlertSeverity = 'critical' | 'warning' | 'info';
 

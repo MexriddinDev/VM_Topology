@@ -8,41 +8,85 @@ import {
     buildMockTopology,
     mockApi,
 } from '../lib/api';
-import type { Server, Alert, ServerMetrics, TopologyLayout, TopologyDashboard } from '../types';
+
+import type {
+    Server,
+    Alert,
+    ServerMetrics,
+    TopologyLayout,
+    TopologyDashboard
+} from '../types';
 
 export const USE_MOCK = import.meta.env.VITE_USE_MOCK === 'true';
 const POLL_INTERVAL = 5000;
 
+// ─────────────────────────────────────────────
+// 🔥 NORMALIZER (ENG MUHIM QISM)
+// ─────────────────────────────────────────────
+function normalizeServer(s: any): Server {
+    return {
+        id: s.id,
+        name: s.name,
+        instance: s.instance ?? `${s.ip}:9100`,
+        job: s.job ?? 'node',
+        type: s.type ?? 'vm',
+        status: s.status ?? 'down',
+        cpu_percent: Number(s.cpu_percent ?? 0),
+        ram_percent: Number(s.ram_percent ?? 0),
+        ip: s.ip,
+        port: s.port ?? 9100,
+        labels: s.labels ?? {},
+        layers: s.layers ?? ['infra'],
+        jobs: s.jobs ?? [],
+    };
+}
+
+// ─────────────────────────────────────────────
+// SERVERS HOOK
+// ─────────────────────────────────────────────
 export function useServers(filters?: { status?: string; search?: string }) {
     const [servers, setServers] = useState<Server[]>([]);
     const [loading, setLoading] = useState(true);
 
     const fetchServers = useCallback(async () => {
+        setLoading(true);
+
         try {
+            let data: any[] = [];
+
             if (USE_MOCK) {
-                let data = [...mockServers];
-                if (filters?.status) data = data.filter((s) => s.status === filters.status);
-                if (filters?.search) {
-                    const q = filters.search.toLowerCase();
-                    data = data.filter(
-                        (s) =>
-                            s.name.toLowerCase().includes(q) ||
-                            s.ip.includes(q) ||
-                            s.instance.includes(q)
-                    );
-                }
-                setServers(data);
+                data = [...mockServers];
             } else {
-                const data = await api.getServers(filters);
-                setServers(Array.isArray(data) ? data : []);
+                const res = await api.getServers(filters);
+                data = Array.isArray(res) ? res : [];
             }
+
+            // FILTER
+            if (filters?.status) {
+                data = data.filter((s) => s.status === filters.status);
+            }
+
+            if (filters?.search) {
+                const q = filters.search.toLowerCase();
+                data = data.filter(
+                    (s) =>
+                        (s.name ?? '').toLowerCase().includes(q) ||
+                        (s.ip ?? '').includes(q) ||
+                        (s.instance ?? '').includes(q)
+                );
+            }
+
+            // 🔥 FIX: TYPE SAFE SET
+            setServers(data.map(normalizeServer));
+
         } finally {
             setLoading(false);
         }
-    }, [JSON.stringify(filters)]);
+    }, [filters?.status, filters?.search]);
 
     useEffect(() => {
         fetchServers();
+
         if (!USE_MOCK) {
             const interval = setInterval(fetchServers, POLL_INTERVAL);
             return () => clearInterval(interval);
@@ -52,6 +96,9 @@ export function useServers(filters?: { status?: string; search?: string }) {
     return { servers, loading, refresh: fetchServers };
 }
 
+// ─────────────────────────────────────────────
+// ALERTS
+// ─────────────────────────────────────────────
 export function useAlerts() {
     const [alerts, setAlerts] = useState<Alert[]>([]);
     const [loading, setLoading] = useState(true);
@@ -62,6 +109,7 @@ export function useAlerts() {
             setLoading(false);
             return;
         }
+
         const load = async () => {
             try {
                 const data = await api.getAlerts();
@@ -70,6 +118,7 @@ export function useAlerts() {
                 setLoading(false);
             }
         };
+
         load();
         const interval = setInterval(load, POLL_INTERVAL);
         return () => clearInterval(interval);
@@ -78,19 +127,25 @@ export function useAlerts() {
     return { alerts, loading };
 }
 
+// ─────────────────────────────────────────────
+// METRICS
+// ─────────────────────────────────────────────
 export function useServerMetrics(serverId: string | null) {
     const [metrics, setMetrics] = useState<ServerMetrics | null>(null);
     const [loading, setLoading] = useState(false);
 
     useEffect(() => {
         if (!serverId) return;
+
         setLoading(true);
+
         if (USE_MOCK) {
             const server = mockServers.find((s) => s.id === serverId);
             if (server) setMetrics(mockMetrics(server));
             setLoading(false);
             return;
         }
+
         const load = async () => {
             try {
                 const data = await api.getServerMetrics(serverId);
@@ -99,6 +154,7 @@ export function useServerMetrics(serverId: string | null) {
                 setLoading(false);
             }
         };
+
         load();
         const interval = setInterval(load, POLL_INTERVAL);
         return () => clearInterval(interval);
@@ -107,6 +163,9 @@ export function useServerMetrics(serverId: string | null) {
     return { metrics, loading };
 }
 
+// ─────────────────────────────────────────────
+// TOPOLOGIES
+// ─────────────────────────────────────────────
 export function useTopologies() {
     const [topologies, setTopologies] = useState<TopologyDashboard[]>([]);
     const [loading, setLoading] = useState(true);
@@ -124,31 +183,16 @@ export function useTopologies() {
         }
     }, []);
 
-    useEffect(() => { refresh(); }, [refresh]);
-
-    const createTopology = useCallback(async (name: string, description?: string) => {
-        if (USE_MOCK) {
-            const newT: TopologyDashboard = {
-                id: Date.now(), name, description, is_default: false,
-                sort_order: mockTopologies.length, node_count: 0, edge_count: 0,
-            };
-            mockTopologies.push(newT);
-            await refresh();
-            return newT;
-        }
-        const created = await api.createTopology({ name, description });
-        await refresh();
-        return created;
+    useEffect(() => {
+        refresh();
     }, [refresh]);
 
-    const deleteTopology = useCallback(async (id: number) => {
-        if (!USE_MOCK) await api.deleteTopology(id);
-        await refresh();
-    }, [refresh]);
-
-    return { topologies, loading, refresh, createTopology, deleteTopology };
+    return { topologies, loading, refresh };
 }
 
+// ─────────────────────────────────────────────
+// SINGLE TOPOLOGY
+// ─────────────────────────────────────────────
 export function useTopology(topologyId: number | null) {
     const [topology, setTopology] = useState<TopologyLayout | null>(null);
     const [loading, setLoading] = useState(true);
@@ -157,7 +201,9 @@ export function useTopology(topologyId: number | null) {
 
     const load = useCallback(async () => {
         if (!topologyId) return;
+
         setLoading(true);
+
         try {
             if (USE_MOCK) {
                 setTopology(mockApi.getStoredTopology(topologyId));
@@ -172,18 +218,23 @@ export function useTopology(topologyId: number | null) {
         }
     }, [topologyId]);
 
-    useEffect(() => { load(); }, [load]);
+    useEffect(() => {
+        load();
+    }, [load]);
 
     const saveTopology = useCallback(
         async (layout: Omit<TopologyLayout, 'topology' | 'links'>, action = 'auto_save') => {
             if (!topologyId) return false;
+
             setSaveError(null);
+
             try {
                 if (USE_MOCK) {
                     await mockApi.saveTopology(topologyId, layout);
                 } else {
                     await api.saveTopology(topologyId, { ...layout, action });
                 }
+
                 setLastSavedAt(new Date());
                 return true;
             } catch (e) {
@@ -194,5 +245,12 @@ export function useTopology(topologyId: number | null) {
         [topologyId]
     );
 
-    return { topology, loading, saveTopology, saveError, lastSavedAt, reload: load };
+    return {
+        topology,
+        loading,
+        saveTopology,
+        saveError,
+        lastSavedAt,
+        reload: load,
+    };
 }

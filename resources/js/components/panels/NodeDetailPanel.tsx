@@ -1,40 +1,29 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Cpu, Activity, Database, Zap, Layers, AlertOctagon, ArrowLeft } from 'lucide-react';
+import {
+    X, Cpu, Activity, Database, Zap, Layers, AlertOctagon, ArrowLeft,
+    Clock, HardDrive,
+} from 'lucide-react';
 import type { ServerMetrics, VmLayer } from '../../types';
 import { useServerMetrics } from '../../hooks/useInfraData';
 import { useTheme } from '../../context/ThemeContext';
-import MetricGauge from '../ui/MetricGauge';
 import VmLayerTopology from './VmLayerTopology';
+import {
+    Panel, RingGauge, DonutUsage, SegmentedBar, TimeSeriesChart, MetricTile,
+    TONE, toneForPercent, useHistory,
+    formatBytes, formatUptime,
+} from '../ui/Charts';
 
-function formatBytes(bytes: number): string {
-    if (bytes < 1024 ** 3) return `${(bytes / 1024 ** 2).toFixed(1)} MB`;
-    return `${(bytes / 1024 ** 3).toFixed(1)} GB`;
-}
+interface Props { serverId: string | null; onClose: () => void; }
 
-function formatUptime(seconds: number): string {
-    const d = Math.floor(seconds / 86400);
-    const h = Math.floor((seconds % 86400) / 3600);
-    if (d > 0) return `${d}d ${h}h`;
-    return `${h}h`;
-}
-
-function MetricRow({ label, value, unit, isDark }: {
-    label: string; value: number | string; unit?: string; isDark: boolean;
-}) {
+function Kpi({ label, value, tone, isDark }: { label: string; value: string; tone: keyof typeof TONE; isDark: boolean }) {
+    const t = TONE[tone];
     return (
-        <div className={`flex justify-between py-3 border-b ${isDark ? 'border-slate-800' : 'border-slate-100'}`}>
-            <span className={`text-base ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>{label}</span>
-            <span className={`text-base font-mono font-bold ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
-                {typeof value === 'number' ? value.toFixed(value < 10 ? 2 : 1) : value}{unit && ` ${unit}`}
-            </span>
+        <div className="rounded-2xl border px-4 py-2.5 text-right" style={{ borderColor: `${t.c}40`, background: `${t.c}10` }}>
+            <div className={`text-[10px] font-bold uppercase tracking-[0.25em] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{label}</div>
+            <div className="font-mono text-lg font-black" style={{ color: t.c }}>{value}</div>
         </div>
     );
-}
-
-interface Props {
-    serverId: string | null;
-    onClose: () => void;
 }
 
 export default function NodeDetailPanel({ serverId, onClose }: Props) {
@@ -44,16 +33,22 @@ export default function NodeDetailPanel({ serverId, onClose }: Props) {
     const status = metrics?.server.status ?? 'unknown';
     const isDown = status === 'down';
 
-    const bg = isDark ? '#0f1419' : '#f4f6f9';
+    const cpuHist = useHistory(metrics?.infra.cpu_percent ?? 0);
+    const memHist = useHistory(metrics?.infra.memory_percent ?? 0);
+    const latP50Hist = useHistory(metrics?.app?.latency_p50_ms ?? 0);
+    const latP99Hist = useHistory(metrics?.app?.latency_p99_ms ?? 0);
+
+    const bg = isDark
+        ? 'radial-gradient(1200px 600px at 0% 0%, rgba(34,211,238,0.05), transparent), radial-gradient(1200px 600px at 100% 100%, rgba(167,139,250,0.05), transparent), #0a0f1a'
+        : '#f4f6f9';
     const card = isDark ? '#1a2332' : '#ffffff';
     const border = isDark ? '#2d3a4f' : '#e2e8f0';
     const textH = isDark ? 'text-slate-100' : 'text-slate-900';
     const textM = isDark ? 'text-slate-400' : 'text-slate-600';
     const statusTone =
-        status === 'healthy' ? { bg: '#0f2a1c', border: '#16a34a55', text: '#4ade80' } :
-        status === 'warning' ? { bg: '#1f2a0f', border: '#84cc1655', text: '#a3e635' } :
-        status === 'down' ? { bg: '#2a1515', border: '#ef444455', text: '#f87171' } :
-        { bg: '#111827', border: '#334155', text: '#cbd5e1' };
+        status === 'up' ? { bg: '#0f2a1c', border: '#16a34a55', text: '#4ade80' } :
+                status === 'down' ? { bg: '#2a1515', border: '#ef444455', text: '#f87171' } :
+                    { bg: '#111827', border: '#334155', text: '#cbd5e1' };
 
     return (
         <AnimatePresence>
@@ -67,15 +62,12 @@ export default function NodeDetailPanel({ serverId, onClose }: Props) {
                     style={{ background: bg }}
                 >
                     <header
-                        className="flex flex-shrink-0 items-center gap-4 border-b px-6 py-4 lg:px-8"
-                        style={{
-                            background: isDark ? '#0b1220' : card,
-                            borderColor: isDark ? '#243047' : border,
-                        }}
+                        className="flex flex-shrink-0 flex-wrap items-center gap-3 border-b px-4 py-3 backdrop-blur-md sm:gap-4 sm:px-6 sm:py-4 lg:px-8"
+                        style={{ background: isDark ? 'rgba(11,18,32,0.85)' : card, borderColor: isDark ? '#243047' : border }}
                     >
                         <button
                             onClick={onClose}
-                            className={`flex items-center gap-2 rounded-2xl border px-4 py-2.5 text-sm font-bold uppercase tracking-[0.2em] ${isDark ? 'border-slate-700 bg-[#111827] text-slate-300 hover:bg-slate-800' : 'border-slate-200 text-slate-700 hover:bg-slate-50'}`}
+                            className={`flex items-center gap-2 rounded-2xl border px-4 py-2.5 text-sm font-bold uppercase tracking-[0.2em] transition-colors ${isDark ? 'border-slate-700 bg-[#111827] text-slate-300 hover:bg-slate-800' : 'border-slate-200 text-slate-700 hover:bg-slate-50'}`}
                         >
                             <ArrowLeft size={18} /> Back
                         </button>
@@ -84,8 +76,8 @@ export default function NodeDetailPanel({ serverId, onClose }: Props) {
                             {metrics && (
                                 <>
                                     <div className="text-[10px] font-black uppercase tracking-[0.35em] text-cyan-400">Server detail</div>
-                                    <h1 className={`truncate text-2xl font-black lg:text-3xl ${textH}`}>{metrics.server.name}</h1>
-                                    <p className={`mt-0.5 font-mono text-sm lg:text-base ${textM}`}>{metrics.server.ip}:{metrics.server.port}</p>
+                                    <h1 className={`truncate text-xl font-black sm:text-2xl lg:text-3xl ${textH}`}>{metrics.server.name}</h1>
+                                    <p className={`mt-0.5 truncate font-mono text-xs sm:text-sm lg:text-base ${textM}`}>{metrics.server.ip}:{metrics.server.port}</p>
                                 </>
                             )}
                         </div>
@@ -102,24 +94,19 @@ export default function NodeDetailPanel({ serverId, onClose }: Props) {
 
                         {metrics && (
                             <div className="hidden items-center gap-2 lg:flex">
-                                <div className="rounded-2xl border border-slate-700 bg-[#111827] px-4 py-2 text-right">
-                                    <div className="text-[10px] font-bold uppercase tracking-[0.25em] text-slate-500">CPU</div>
-                                    <div className="font-mono text-lg font-black text-white">{metrics.infra.cpu_percent.toFixed(1)}%</div>
-                                </div>
-                                <div className="rounded-2xl border border-slate-700 bg-[#111827] px-4 py-2 text-right">
-                                    <div className="text-[10px] font-bold uppercase tracking-[0.25em] text-slate-500">RAM</div>
-                                    <div className="font-mono text-lg font-black text-white">{metrics.infra.memory_percent.toFixed(1)}%</div>
-                                </div>
+                                <Kpi label="CPU" value={`${metrics.infra.cpu_percent.toFixed(1)}%`} tone={toneForPercent(metrics.infra.cpu_percent)} isDark={isDark} />
+                                <Kpi label="RAM" value={`${metrics.infra.memory_percent.toFixed(1)}%`} tone={toneForPercent(metrics.infra.memory_percent)} isDark={isDark} />
                             </div>
                         )}
 
-                        <button onClick={onClose} className={`p-3 rounded-xl ${isDark ? 'hover:bg-slate-800 text-slate-400' : 'hover:bg-slate-100 text-slate-500'}`}>
+                        <button onClick={onClose} className={`rounded-xl p-3 transition-colors ${isDark ? 'hover:bg-slate-800 text-slate-400' : 'hover:bg-slate-100 text-slate-500'}`}>
                             <X size={24} />
                         </button>
                     </header>
 
                     {loading && (
-                        <div className={`flex-1 flex items-center justify-center text-lg ${textM}`}>
+                        <div className={`flex flex-1 flex-col items-center justify-center gap-3 text-lg ${textM}`}>
+                            <span className="h-8 w-8 animate-spin rounded-full border-2 border-cyan-400 border-t-transparent" />
                             Loading metrics from Prometheus...
                         </div>
                     )}
@@ -127,140 +114,122 @@ export default function NodeDetailPanel({ serverId, onClose }: Props) {
                     {!loading && metrics && (
                         <div className="flex-1 overflow-y-auto p-4 lg:p-6">
                             <div className="mx-auto max-w-[1600px] space-y-6">
-                                <div className="grid grid-cols-2 gap-4 xl:grid-cols-4">
-                                    {[
-                                        { label: 'CPU load', value: `${metrics.infra.cpu_percent.toFixed(1)}%`, hint: 'System compute', tone: 'green' },
-                                        { label: 'Memory', value: `${metrics.infra.memory_percent.toFixed(1)}%`, hint: 'Active usage', tone: 'green' },
-                                        { label: 'Disk', value: `${metrics.infra.disk_percent.toFixed(1)}%`, hint: 'Volume pressure', tone: 'green' },
-                                        { label: 'Uptime', value: formatUptime(metrics.infra.uptime_seconds), hint: 'Live host time', tone: 'cyan' },
-                                    ].map((item) => (
-                                        <div key={item.label} className="rounded-3xl border border-slate-700 bg-[#0f172a] p-5 shadow-[0_20px_60px_rgba(0,0,0,0.25)]">
-                                            <div className="text-[10px] font-black uppercase tracking-[0.35em] text-slate-500">{item.label}</div>
-                                            <div className={`mt-3 text-3xl font-black ${item.tone === 'cyan' ? 'text-cyan-300' : 'text-white'}`}>{item.value}</div>
-                                            <div className="mt-2 text-sm text-slate-400">{item.hint}</div>
-                                        </div>
-                                    ))}
-                                </div>
 
-                                <div className="grid grid-cols-1 gap-6 xl:grid-cols-12">
-                                    <div className="space-y-6 xl:col-span-7">
-                                        <VmLayerTopology metrics={metrics} />
-
-                                        <div className="rounded-3xl border border-slate-700 bg-[#0f172a] p-6 shadow-[0_20px_60px_rgba(0,0,0,0.25)]">
-                                            <div className="mb-4 flex items-center gap-3">
-                                                <Layers size={22} className="text-cyan-400" />
-                                                <h2 className={`text-xl font-black ${textH}`}>Active Exporters</h2>
-                                            </div>
-                                            <div className="grid grid-cols-2 gap-3">
-                                                {(metrics.layers as VmLayer[]).map((layer) => (
-                                                    <div
-                                                        key={layer}
-                                                        className="rounded-2xl border border-slate-700 bg-[#111827] px-4 py-3 text-sm font-semibold capitalize text-slate-200"
-                                                    >
-                                                        {layer}
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        </div>
-
-                                        <div className="rounded-3xl border border-slate-700 bg-[#0f172a] p-6 shadow-[0_20px_60px_rgba(0,0,0,0.25)]">
-                                            <div className="mb-4 flex items-center gap-3">
-                                                <Activity size={22} className="text-emerald-400" />
-                                                <h2 className={`text-xl font-black ${textH}`}>Signal Summary</h2>
-                                            </div>
-                                            <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-                                                <MetricGauge label="CPU" value={metrics.infra.cpu_percent} warn={80} crit={90} size="lg" />
-                                                <MetricGauge label="Memory" value={metrics.infra.memory_percent} warn={85} crit={95} size="lg" />
-                                                <MetricGauge label="Disk" value={metrics.infra.disk_percent} warn={80} crit={90} size="lg" />
-                                            </div>
+                                <Panel title="System Vitals" icon={Cpu} tone="cyan" isDark={isDark} subtitle="Core node_exporter signals">
+                                    <div className="grid grid-cols-2 gap-x-4 gap-y-8 md:grid-cols-4">
+                                        <RingGauge label="CPU Load" value={metrics.infra.cpu_percent} sub="System compute" icon={Cpu} isDark={isDark} />
+                                        <RingGauge label="Memory" value={metrics.infra.memory_percent} sub={formatBytes(metrics.infra.memory_used_bytes)} icon={Layers} isDark={isDark} />
+                                        <RingGauge label="Disk" value={metrics.infra.disk_percent} sub={`${formatBytes(metrics.infra.disk_avail_bytes)} free`} icon={HardDrive} isDark={isDark} />
+                                        <div className="flex flex-col items-center justify-center rounded-2xl border px-4 py-3" style={{ borderColor: isDark ? '#1e293b' : '#e2e8f0', background: isDark ? '#0b1220' : '#f8fafc' }}>
+                                            <Clock size={22} className="text-cyan-400" />
+                                            <span className={`mt-2 font-mono text-2xl font-black ${textH}`}>{formatUptime(metrics.infra.uptime_seconds)}</span>
+                                            <div className={`mt-1 text-xs font-black uppercase tracking-[0.2em] ${textM}`}>Uptime</div>
+                                            <div className={`mt-1 font-mono text-xs ${textM}`}>load1: {metrics.infra.load1.toFixed(2)}</div>
                                         </div>
                                     </div>
+                                </Panel>
 
-                                    <div className="space-y-6 xl:col-span-5">
-                                        <div className="rounded-3xl border border-slate-700 bg-[#0f172a] p-6 shadow-[0_20px_60px_rgba(0,0,0,0.25)]">
-                                            <div className="mb-6 flex items-center gap-3">
-                                                <Cpu size={22} className="text-cyan-400" />
-                                                <h2 className={`text-xl font-black ${textH}`}>Infrastructure Metrics</h2>
-                                            </div>
-                                            <div className="space-y-3">
-                                                <MetricRow label="Memory Used" value={formatBytes(metrics.infra.memory_used_bytes)} isDark={true} />
-                                                <MetricRow label="Memory Total" value={formatBytes(metrics.infra.memory_total_bytes)} isDark={true} />
-                                                <MetricRow label="Disk Available" value={formatBytes(metrics.infra.disk_avail_bytes)} isDark={true} />
-                                                <MetricRow label="Network RX" value={`${formatBytes(metrics.infra.net_rx_bytes_sec)}/s`} isDark={true} />
-                                                <MetricRow label="Network TX" value={`${formatBytes(metrics.infra.net_tx_bytes_sec)}/s`} isDark={true} />
-                                                <MetricRow label="Load (1m)" value={metrics.infra.load1} isDark={true} />
-                                            </div>
+                                <div className="columns-1 gap-6 space-y-6 xl:columns-2 [&>*]:mb-6 [&>*]:break-inside-avoid">
+                                    <VmLayerTopology metrics={metrics} />
+
+                                    <Panel title="Signal Summary" icon={Activity} tone="green" isDark={isDark} subtitle="At-a-glance health">
+                                        <div className="grid grid-cols-3 gap-x-2 gap-y-6">
+                                            <RingGauge label="CPU" value={metrics.infra.cpu_percent} size={130} isDark={isDark} />
+                                            <RingGauge label="Memory" value={metrics.infra.memory_percent} size={130} warn={85} crit={95} isDark={isDark} />
+                                            <RingGauge label="Disk" value={metrics.infra.disk_percent} size={130} isDark={isDark} />
                                         </div>
+                                    </Panel>
 
-                                        {metrics.app && (
-                                            <div className="rounded-3xl border border-slate-700 bg-[#0f172a] p-6 shadow-[0_20px_60px_rgba(0,0,0,0.25)]">
-                                                <div className="mb-4 flex items-center gap-3">
-                                                    <Activity size={22} className="text-cyan-400" />
-                                                    <h2 className={`text-xl font-black ${textH}`}>Application Layer</h2>
-                                                </div>
-                                                <div className="grid grid-cols-2 gap-3">
-                                                    <div className="rounded-2xl border border-slate-700 bg-[#111827] p-4">
-                                                        <div className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-500">Requests/sec</div>
-                                                        <div className="mt-2 text-2xl font-black text-white">{metrics.app.requests_per_sec.toFixed(2)}</div>
-                                                    </div>
-                                                    <div className="rounded-2xl border border-slate-700 bg-[#111827] p-4">
-                                                        <div className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-500">5xx Error</div>
-                                                        <div className="mt-2 text-2xl font-black text-red-400">{metrics.app.error_rate_5xx.toFixed(2)}%</div>
-                                                    </div>
-                                                </div>
-                                                <div className="mt-4 space-y-3">
-                                                    <MetricRow label="Latency P50" value={metrics.app.latency_p50_ms} unit="ms" isDark={true} />
-                                                    <MetricRow label="Latency P95" value={metrics.app.latency_p95_ms} unit="ms" isDark={true} />
-                                                    <MetricRow label="Latency P99" value={metrics.app.latency_p99_ms} unit="ms" isDark={true} />
+                                    <Panel title="CPU & Memory over time" icon={Activity} tone="green" isDark={isDark} subtitle="Last 2 minutes">
+                                        <TimeSeriesChart
+                                            isDark={isDark}
+                                            unit="%"
+                                            formatValue={(v) => v.toFixed(0)}
+                                            series={[
+                                                { label: 'CPU', color: 'cyan', data: cpuHist },
+                                                { label: 'Memory', color: 'violet', data: memHist },
+                                            ]}
+                                        />
+                                    </Panel>
+
+                                    {metrics.app && (
+                                        <Panel title="Application Layer" icon={Activity} tone="cyan" isDark={isDark} subtitle="HTTP request metrics">
+                                            <div className="mb-5 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                                                <MetricTile label="Requests/sec" value={metrics.app.requests_per_sec.toFixed(2)} tone="cyan" icon={Activity} isDark={isDark} />
+                                                <div className="flex justify-center">
+                                                    <RingGauge label="5xx Errors" value={metrics.app.error_rate_5xx} size={130} warn={2} crit={5} max={10} isDark={isDark} />
                                                 </div>
                                             </div>
-                                        )}
+                                            <div className="mb-5">
+                                                <TimeSeriesChart
+                                                    isDark={isDark}
+                                                    unit="ms"
+                                                    height={130}
+                                                    series={[
+                                                        { label: 'P50', color: 'green', data: latP50Hist },
+                                                        { label: 'P99', color: 'red', data: latP99Hist },
+                                                    ]}
+                                                />
+                                            </div>
+                                            <SegmentedBar label="Latency P95" value={metrics.app.latency_p95_ms} max={Math.max(metrics.app.latency_p99_ms, 1)} unit=" ms" tone="amber" isDark={isDark} />
+                                        </Panel>
+                                    )}
 
-                                        {metrics.database && (
-                                            <div className="rounded-3xl border border-slate-700 bg-[#0f172a] p-6 shadow-[0_20px_60px_rgba(0,0,0,0.25)]">
-                                                <div className="mb-4 flex items-center gap-3">
-                                                    <Database size={22} className="text-cyan-400" />
-                                                    <h2 className={`text-xl font-black ${textH}`}>Database Layer</h2>
-                                                </div>
-                                                <div className="grid grid-cols-2 gap-3">
-                                                    <div className="rounded-2xl border border-slate-700 bg-[#111827] p-4">
-                                                        <div className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-500">Status</div>
-                                                        <div className={`mt-2 text-2xl font-black ${metrics.database.up ? 'text-emerald-400' : 'text-red-400'}`}>{metrics.database.up ? 'UP' : 'DOWN'}</div>
+                                    <Panel title="Capacity" icon={HardDrive} tone="cyan" isDark={isDark} subtitle="Storage & memory usage">
+                                        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+                                            <DonutUsage label="Memory" used={metrics.infra.memory_used_bytes} total={metrics.infra.memory_total_bytes} isDark={isDark} />
+                                            <DonutUsage label="Disk" used={metrics.infra.disk_total_bytes - metrics.infra.disk_avail_bytes} total={metrics.infra.disk_total_bytes} isDark={isDark} />
+                                        </div>
+                                    </Panel>
+
+                                    {metrics.database && (
+                                        <Panel title="Database Layer" icon={Database} tone={metrics.database.up ? 'green' : 'red'} isDark={isDark} subtitle="PostgreSQL">
+                                            <div className="mb-4 flex items-center justify-between rounded-2xl border p-4" style={{ borderColor: isDark ? '#1e293b' : '#e2e8f0' }}>
+                                                <span className={`text-xs font-black uppercase tracking-[0.2em] ${textM}`}>Status</span>
+                                                <span className="flex items-center gap-2 font-mono text-lg font-black" style={{ color: metrics.database.up ? TONE.green.c : TONE.red.c }}>
+                                                    <span className="h-2.5 w-2.5 rounded-full" style={{ background: metrics.database.up ? TONE.green.c : TONE.red.c }} />
+                                                    {metrics.database.up ? 'UP' : 'DOWN'}
+                                                </span>
+                                            </div>
+                                            <div className="space-y-4">
+                                                <SegmentedBar label="Connections" value={metrics.database.connections} max={Math.max(metrics.database.connections * 1.5, 20)} tone="cyan" isDark={isDark} />
+                                                <SegmentedBar label="Slow Queries" value={metrics.database.slow_queries} max={Math.max(metrics.database.slow_queries * 1.5, 10)} tone="amber" isDark={isDark} />
+                                                <SegmentedBar label="Max Query Duration" value={metrics.database.max_query_duration} max={Math.max(metrics.database.max_query_duration * 1.5, 5)} unit=" s" tone="violet" isDark={isDark} />
+                                            </div>
+                                        </Panel>
+                                    )}
+
+                                    {metrics.redis && (
+                                        <Panel title="Redis Cache" icon={Zap} tone={metrics.redis.up ? 'green' : 'red'} isDark={isDark} subtitle="In-memory cache">
+                                            <div className="mb-5 flex flex-wrap items-center gap-5">
+                                                <RingGauge label="Hit Ratio" value={metrics.redis.hit_ratio} size={130} warn={70} crit={50} invert isDark={isDark} />
+                                                <div className="min-w-[140px] flex-1">
+                                                    <div className="mb-2 flex items-center justify-between">
+                                                        <span className={`text-xs font-black uppercase tracking-[0.2em] ${textM}`}>Status</span>
+                                                        <span className="font-mono text-sm font-black" style={{ color: metrics.redis.up ? TONE.green.c : TONE.red.c }}>
+                                                            {metrics.redis.up ? 'UP' : 'DOWN'}
+                                                        </span>
                                                     </div>
-                                                    <div className="rounded-2xl border border-slate-700 bg-[#111827] p-4">
-                                                        <div className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-500">Connections</div>
-                                                        <div className="mt-2 text-2xl font-black text-white">{metrics.database.connections}</div>
-                                                    </div>
-                                                </div>
-                                                <div className="mt-4">
-                                                    <MetricRow label="Slow Queries" value={metrics.database.slow_queries} isDark={true} />
+                                                    <div className={`font-mono text-xs ${textM}`}>Memory: {formatBytes(metrics.redis.memory_bytes)}</div>
                                                 </div>
                                             </div>
-                                        )}
-
-                                        {metrics.redis && (
-                                            <div className="rounded-3xl border border-slate-700 bg-[#0f172a] p-6 shadow-[0_20px_60px_rgba(0,0,0,0.25)]">
-                                                <div className="mb-4 flex items-center gap-3">
-                                                    <Zap size={22} className="text-cyan-400" />
-                                                    <h2 className={`text-xl font-black ${textH}`}>Redis Cache</h2>
-                                                </div>
-                                                <div className="grid grid-cols-2 gap-3">
-                                                    <div className="rounded-2xl border border-slate-700 bg-[#111827] p-4">
-                                                        <div className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-500">Status</div>
-                                                        <div className={`mt-2 text-2xl font-black ${metrics.redis.up ? 'text-emerald-400' : 'text-red-400'}`}>{metrics.redis.up ? 'UP' : 'DOWN'}</div>
-                                                    </div>
-                                                    <div className="rounded-2xl border border-slate-700 bg-[#111827] p-4">
-                                                        <div className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-500">Hit Ratio</div>
-                                                        <div className="mt-2 text-2xl font-black text-white">{metrics.redis.hit_ratio.toFixed(2)}%</div>
-                                                    </div>
-                                                </div>
-                                                <div className="mt-4 space-y-3">
-                                                    <MetricRow label="Commands/sec" value={metrics.redis.commands_sec} isDark={true} />
-                                                    <MetricRow label="Evictions/sec" value={metrics.redis.evictions_sec} isDark={true} />
-                                                </div>
+                                            <div className="space-y-4">
+                                                <SegmentedBar label="Commands/sec" value={metrics.redis.commands_sec} max={Math.max(metrics.redis.commands_sec * 1.3, 100)} tone="cyan" isDark={isDark} />
+                                                <SegmentedBar label="Evictions/sec" value={metrics.redis.evictions_sec} max={Math.max(metrics.redis.evictions_sec * 1.3, 10)} tone="red" isDark={isDark} />
                                             </div>
-                                        )}
-                                    </div>
+                                        </Panel>
+                                    )}
+
+                                    <Panel title="Active Exporters" icon={Layers} tone="violet" isDark={isDark} subtitle="Detected Prometheus targets">
+                                        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                                            {(metrics.layers as VmLayer[]).map((layer) => (
+                                                <div key={layer} className="rounded-2xl border px-4 py-3 text-center text-sm font-bold capitalize transition-colors"
+                                                     style={{ borderColor: isDark ? '#1e293b' : '#e2e8f0', background: isDark ? '#0b1220' : '#f8fafc', color: isDark ? '#e2e8f0' : '#1e293b' }}>
+                                                    {layer}
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </Panel>
                                 </div>
                             </div>
                         </div>

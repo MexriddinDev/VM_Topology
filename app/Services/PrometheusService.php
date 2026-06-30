@@ -12,12 +12,9 @@ class PrometheusService
 
     public function __construct()
     {
-        $this->baseUrl = config('prometheus.url', env('PROMETHEUS_URL', 'http://172.28.201.50:9090'));
+        $this->baseUrl = config('prometheus.url', env('PROMETHEUS_URL', 'http://172.28.6.50:9000'));
     }
 
-    /**
-     * Execute a Prometheus instant query
-     */
     public function query(string $promql): array
     {
         try {
@@ -36,9 +33,6 @@ class PrometheusService
         return [];
     }
 
-    /**
-     * Execute a Prometheus range query
-     */
     public function queryRange(string $promql, int $start, int $end, string $step = '60s'): array
     {
         try {
@@ -61,32 +55,29 @@ class PrometheusService
     }
 
     /**
-     * Get all active targets (discovered servers/services)
+     * Get all active targets (discovered servers/services).
+     * Cached for a short TTL so we don't hammer Prometheus on every request.
      */
     public function getTargets(): array
     {
-        try {
-            $response = Http::timeout(5)->get("{$this->baseUrl}/api/v1/targets");
-            if ($response->successful()) {
-                return $response->json()['data']['activeTargets'] ?? [];
+        return Cache::remember('prom:targets', $this->cacheTtl, function () {
+            try {
+                $response = Http::timeout(5)->get("{$this->baseUrl}/api/v1/targets");
+                if ($response->successful()) {
+                    return $response->json()['data']['activeTargets'] ?? [];
+                }
+            } catch (\Exception $e) {
+                \Log::error("Prometheus targets fetch failed", ['error' => $e->getMessage()]);
             }
-        } catch (\Exception $e) {
-            \Log::error("Prometheus targets fetch failed", ['error' => $e->getMessage()]);
-        }
-        return [];
+            return [];
+        });
     }
 
-    /**
-     * Get scalar value from instant query result
-     */
     public function scalarValue(array $result, float $default = 0): float
     {
         return isset($result[0]['value'][1]) ? (float) $result[0]['value'][1] : $default;
     }
 
-    /**
-     * Get value by label from result set
-     */
     public function valueByLabel(array $result, string $label, string $value): ?float
     {
         foreach ($result as $item) {
@@ -98,8 +89,87 @@ class PrometheusService
     }
 
     /**
-     * All OS/Node metrics for a specific instance
+     * Index a PromQL result set (grouped `by (instance)`) into a map of
+     * instance => float value. This is the core trick that lets us fetch
+     * data for ALL instances with a single HTTP round trip instead of one
+     * round trip per instance.
      */
+    private function indexByInstance(array $result): array
+    {
+        $map = [];
+        foreach ($result as $item) {
+            $instance = $item['metric']['instance'] ?? null;
+            if ($instance === null) continue;
+            $map[$instance] = isset($item['value'][1]) ? (float) $item['value'][1] : 0.0;
+        }
+        return $map;
+    }
+
+    /**
+     * Fetch up/cpu/mem/disk/net/load/uptime for ALL instances in one shot
+     * (one HTTP call per metric, not per instance). Used by buildVmList().
+     *
+     * @return array<string, array> instance => infra metrics array
+     */
+    private function getBulkNodeMetrics(): array
+    {
+        $up        = $this->indexByInstance($this->query('up'));
+        $cpu       = $this->indexByInstance($this->query(
+            '100 - (avg by (instance) (irate(node_cpu_seconds_total{mode="idle"}[5m])) * 100)'
+        ));
+        $memTotal  = $this->indexByInstance($this->query('node_memory_MemTotal_bytes'));
+        $memAvail  = $this->indexByInstance($this->query('node_memory_MemAvailable_bytes'));
+        $diskAvail = $this->indexByInstance($this->query('node_filesystem_avail_bytes{mountpoint="/"}'));
+        $diskTotal = $this->indexByInstance($this->query('node_filesystem_size_bytes{mountpoint="/"}'));
+        $netRx     = $this->indexByInstance($this->query('irate(node_network_receive_bytes_total{device!="lo"}[5m])'));
+        $netTx     = $this->indexByInstance($this->query('irate(node_network_transmit_bytes_total{device!="lo"}[5m])'));
+        $load1     = $this->indexByInstance($this->query('node_load1'));
+        $uptime    = $this->indexByInstance($this->query('node_time_seconds - node_boot_time_seconds'));
+        $appRps    = $this->indexByInstance($this->query('sum by (instance) (irate(http_requests_total[5m]))'));
+        $pgUp      = $this->indexByInstance($this->query('postgres_up'));
+        $redisUp   = $this->indexByInstance($this->query('redis_up'));
+
+        $instances = array_keys($up);
+        $out = [];
+
+        foreach ($instances as $instance) {
+            $isUp = $up[$instance] ?? -1;
+            $status = $isUp < 0 ? 'unknown' : ($isUp == 0 ? 'down' : 'up');
+
+            $total = $memTotal[$instance] ?? 0;
+            $avail = $memAvail[$instance] ?? 0;
+            $dTotal = $diskTotal[$instance] ?? 0;
+            $dAvail = $diskAvail[$instance] ?? 0;
+
+            $layers = ['infra'];
+            if ($status === 'up') {
+                if (($appRps[$instance] ?? 0) > 0) $layers[] = 'app';
+                if (($pgUp[$instance] ?? 0) > 0) $layers[] = 'database';
+                if (($redisUp[$instance] ?? 0) > 0) $layers[] = 'redis';
+            }
+
+            $out[$instance] = [
+                'status' => $status,
+                'layers' => $layers,
+                'infra'  => [
+                    'cpu_percent'        => round($status === 'up' ? ($cpu[$instance] ?? 0) : 0, 2),
+                    'memory_percent'     => $total > 0 ? round((1 - $avail / $total) * 100, 2) : 0,
+                    'memory_used_bytes'  => max(0, $total - $avail),
+                    'memory_total_bytes' => $total,
+                    'disk_percent'       => $dTotal > 0 ? round((1 - $dAvail / $dTotal) * 100, 2) : 0,
+                    'disk_avail_bytes'   => $dAvail,
+                    'disk_total_bytes'   => $dTotal,
+                    'net_rx_bytes_sec'   => round($netRx[$instance] ?? 0, 2),
+                    'net_tx_bytes_sec'   => round($netTx[$instance] ?? 0, 2),
+                    'load1'              => round($load1[$instance] ?? 0, 2),
+                    'uptime_seconds'     => (int) ($uptime[$instance] ?? 0),
+                ],
+            ];
+        }
+
+        return $out;
+    }
+
     public function getNodeMetrics(string $instance): array
     {
         $cpuResult = $this->query(
@@ -135,9 +205,6 @@ class PrometheusService
         ];
     }
 
-    /**
-     * Application HTTP metrics
-     */
     public function getAppMetrics(string $instance): array
     {
         $rpsResult       = $this->query("sum(irate(http_requests_total{instance=~\"{$instance}\"}[5m]))");
@@ -157,9 +224,6 @@ class PrometheusService
         ];
     }
 
-    /**
-     * Database (PostgreSQL) metrics
-     */
     public function getDatabaseMetrics(string $instance): array
     {
         $connResult    = $this->query("pg_stat_activity_count{instance=~\"{$instance}\"}");
@@ -175,9 +239,6 @@ class PrometheusService
         ];
     }
 
-    /**
-     * Redis metrics
-     */
     public function getRedisMetrics(string $instance): array
     {
         $upResult       = $this->query("redis_up{instance=~\"{$instance}\"}");
@@ -200,9 +261,6 @@ class PrometheusService
         ];
     }
 
-    /**
-     * Docker container metrics
-     */
     public function getContainerMetrics(string $containerName): array
     {
         $cpuResult     = $this->query("irate(container_cpu_usage_seconds_total{name=\"{$containerName}\"}[5m]) * 100");
@@ -216,9 +274,6 @@ class PrometheusService
         ];
     }
 
-    /**
-     * Kubernetes metrics
-     */
     public function getKubernetesMetrics(string $namespace = ''): array
     {
         $nsFilter = $namespace ? ",namespace=\"{$namespace}\"" : '';
@@ -252,120 +307,149 @@ class PrometheusService
     }
 
     /**
-     * Determine overall health status of an instance
+     * Determine overall status of a single instance: 'up' | 'down' | 'unknown'.
+     * Kept for the single-instance detail endpoint; buildVmList() uses the
+     * bulk path instead and does not call this in a loop.
      */
     public function getInstanceStatus(string $instance): string
     {
         $upResult = $this->query("up{instance=\"{$instance}\"}");
+
+        if (empty($upResult)) {
+            return 'unknown';
+        }
+
         $isUp = $this->scalarValue($upResult, -1);
 
-        if ($isUp < 0) return 'unknown';
-        if ($isUp == 0) return 'down';
+        if ($isUp < 0) {
+            return 'unknown';
+        }
 
-        $cpuResult = $this->query(
-            "100 - (avg by (instance) (irate(node_cpu_seconds_total{mode=\"idle\",instance=\"{$instance}\"}[5m])) * 100)"
-        );
-        $memTotalResult = $this->query("node_memory_MemTotal_bytes{instance=\"{$instance}\"}");
-        $memAvailResult = $this->query("node_memory_MemAvailable_bytes{instance=\"{$instance}\"}");
-
-        $cpu = $this->scalarValue($cpuResult);
-        $memTotal = $this->scalarValue($memTotalResult);
-        $memAvail = $this->scalarValue($memAvailResult);
-        $memPercent = $memTotal > 0 ? (1 - $memAvail / $memTotal) * 100 : 0;
-
-        if ($cpu > 80 || $memPercent > 85) return 'warning';
-
-        return 'healthy';
+        return $isUp == 0 ? 'down' : 'up';
     }
 
     /**
      * Build VM list from Prometheus (topology shows VMs only).
-     * Each VM may expose multiple metric layers (app, database, redis).
+     *
+     * PERFORMANCE: this used to issue ~14 sequential HTTP queries PER VM
+     * (status + layers + full node metrics), which on 15-20+ targets made
+     * the page spin for minutes. It now issues a fixed ~13 bulk queries
+     * TOTAL (one per metric, covering every instance at once via
+     * `by (instance)` grouping), regardless of how many VMs exist.
+     *
+     * Instances whose status is 'unknown' (no up{} series reported yet)
+     * are excluded here — they never reach the topology/search UI, and are
+     * surfaced only through getAlerts().
      */
     public function buildVmList(): array
     {
-        $targets = $this->getTargets();
-        $byInstance = [];
+        return Cache::remember('prom:vm_list', $this->cacheTtl, function () {
+            $targets = $this->getTargets();
+            $bulk    = $this->getBulkNodeMetrics();
+            $byInstance = [];
 
-        foreach ($targets as $target) {
-            $labels   = $target['labels'] ?? [];
-            $instance = $labels['instance'] ?? '';
-            $job      = $labels['job'] ?? 'unknown';
+            foreach ($targets as $target) {
+                $labels   = $target['labels'] ?? [];
+                $instance = $labels['instance'] ?? '';
+                $job      = $labels['job'] ?? 'unknown';
 
-            if (empty($instance)) {
-                continue;
-            }
+                if (empty($instance)) {
+                    continue;
+                }
 
-            // Skip pure container/k8s scrape jobs — topology nodes are VMs
-            $jobLower = strtolower($job);
-            if (str_contains($jobLower, 'kube') || str_contains($jobLower, 'kubernetes')) {
-                continue;
-            }
+                $jobLower = strtolower($job);
+                if (str_contains($jobLower, 'kube') || str_contains($jobLower, 'kubernetes')) {
+                    continue;
+                }
 
-            $ip = explode(':', $instance)[0];
+                $ip = explode(':', $instance)[0];
 
-            if (!isset($byInstance[$ip])) {
-                $byInstance[$ip] = [
-                    'instance' => $instance,
-                    'job'      => $job,
-                    'labels'   => $labels,
-                    'jobs'     => [$job],
-                ];
-            } else {
-                $byInstance[$ip]['jobs'][] = $job;
-                // Prefer node exporter instance as primary
-                if (str_contains($jobLower, 'node') || str_contains($jobLower, 'server')) {
-                    $byInstance[$ip]['instance'] = $instance;
-                    $byInstance[$ip]['job']      = $job;
-                    $byInstance[$ip]['labels']   = $labels;
+                if (!isset($byInstance[$ip])) {
+                    $byInstance[$ip] = [
+                        'instance' => $instance,
+                        'job'      => $job,
+                        'labels'   => $labels,
+                        'jobs'     => [$job],
+                        'health'   => $target['health'] ?? 'unknown',
+                    ];
+                } else {
+                    $byInstance[$ip]['jobs'][] = $job;
+                    if (str_contains($jobLower, 'node') || str_contains($jobLower, 'server')) {
+                        $byInstance[$ip]['instance'] = $instance;
+                        $byInstance[$ip]['job']      = $job;
+                        $byInstance[$ip]['labels']   = $labels;
+                        $byInstance[$ip]['health']   = $target['health'] ?? $byInstance[$ip]['health'];
+                    }
                 }
             }
-        }
 
-        $servers = [];
+            $servers = [];
 
-        foreach ($byInstance as $ip => $meta) {
-            $instance = $meta['instance'];
-            $job      = $meta['job'];
-            $labels   = $meta['labels'];
+            foreach ($byInstance as $ip => $meta) {
+                $instance = $meta['instance'];
+                $job      = $meta['job'];
+                $labels   = $meta['labels'];
 
-            $status = $this->getInstanceStatus($instance);
-            $infra  = $this->getNodeMetrics($instance);
-            $layers = $this->detectVmLayers($instance);
+                $data = $bulk[$instance] ?? null;
 
-            $servers[] = [
-                'id'          => md5($ip),
-                'name'        => $labels['alias'] ?? $labels['hostname'] ?? $ip,
-                'instance'    => $instance,
-                'job'         => $job,
-                'type'        => 'vm',
-                'status'      => $status,
-                'cpu_percent' => $infra['cpu_percent'],
-                'ram_percent' => $infra['memory_percent'],
-                'ip'          => $ip,
-                'port'        => (int) (explode(':', $instance)[1] ?? 9100),
-                'labels'      => $labels,
-                'layers'      => $layers,
-                'jobs'        => array_values(array_unique($meta['jobs'])),
-            ];
-        }
+                $status = $data['status'] ?? 'unknown';
 
-        usort($servers, fn ($a, $b) => strcmp($a['name'], $b['name']));
+                if ($status === 'unknown' && in_array($meta['health'], ['up', 'down'], true)) {
+                    $status = $meta['health'];
+                }
 
-        return $servers;
+                if ($status === 'unknown') {
+                    continue;
+                }
+
+                $infra  = $data['infra'] ?? $this->emptyNodeMetrics();
+                $layers = $data['layers'] ?? ['infra'];
+
+                $servers[] = [
+                    'id'          => md5($ip),
+                    'name'        => $labels['alias'] ?? $labels['hostname'] ?? $ip,
+                    'instance'    => $instance,
+                    'job'         => $job,
+                    'type'        => 'vm',
+                    'status'      => $status,
+                    'cpu_percent' => $infra['cpu_percent'],
+                    'ram_percent' => $infra['memory_percent'],
+                    'ip'          => $ip,
+                    'port'        => (int) (explode(':', $instance)[1] ?? 9100),
+                    'labels'      => $labels,
+                    'layers'      => $layers,
+                    'jobs'        => array_values(array_unique($meta['jobs'])),
+                ];
+            }
+
+            usort($servers, fn ($a, $b) => strcmp($a['name'], $b['name']));
+
+            return $servers;
+        });
     }
 
-    /**
-     * Legacy alias — returns VM list for API compatibility.
-     */
+    private function emptyNodeMetrics(): array
+    {
+        return [
+            'cpu_percent'        => 0,
+            'memory_percent'     => 0,
+            'memory_used_bytes'  => 0,
+            'memory_total_bytes' => 0,
+            'disk_percent'       => 0,
+            'disk_avail_bytes'   => 0,
+            'disk_total_bytes'   => 0,
+            'net_rx_bytes_sec'   => 0,
+            'net_tx_bytes_sec'   => 0,
+            'load1'              => 0,
+            'uptime_seconds'     => 0,
+        ];
+    }
+
     public function buildServerList(): array
     {
         return $this->buildVmList();
     }
 
-    /**
-     * Detect which service layers are present on a VM instance.
-     */
     public function detectVmLayers(string $instance): array
     {
         $layers = ['infra'];
@@ -394,15 +478,15 @@ class PrometheusService
     }
 
     /**
-     * Get active alerts based on thresholds
+     * Get active alerts based on thresholds + unknown/unreachable instances.
+     * Rewritten to use bulk queries instead of per-instance loops.
      */
     public function getAlerts(): array
     {
         $alerts = [];
 
-        // CPU > 80%
         $cpuHigh = $this->query(
-            "100 - (avg by (instance) (irate(node_cpu_seconds_total{mode=\"idle\"}[5m])) * 100) > 80"
+            '100 - (avg by (instance) (irate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 80'
         );
         foreach ($cpuHigh as $item) {
             $instance = $item['metric']['instance'] ?? 'unknown';
@@ -417,9 +501,8 @@ class PrometheusService
             ];
         }
 
-        // RAM > 85%
         $ramHighResult = $this->query(
-            "(1 - node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes) * 100 > 85"
+            '(1 - node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes) * 100 > 85'
         );
         foreach ($ramHighResult as $item) {
             $instance = $item['metric']['instance'] ?? 'unknown';
@@ -434,8 +517,7 @@ class PrometheusService
             ];
         }
 
-        // Services DOWN
-        $downResult = $this->query("up == 0");
+        $downResult = $this->query('up == 0');
         foreach ($downResult as $item) {
             $instance = $item['metric']['instance'] ?? 'unknown';
             $job      = $item['metric']['job'] ?? 'unknown';
@@ -450,8 +532,35 @@ class PrometheusService
             ];
         }
 
-        // K8s Pod crashes
-        $crashResult = $this->query("kube_pod_container_status_waiting_reason{reason=\"CrashLoopBackOff\"} == 1");
+        // UNKNOWN — discovered targets with no up{} series at all.
+        $upMap = $this->indexByInstance($this->query('up'));
+        foreach ($this->getTargets() as $target) {
+            $labels   = $target['labels'] ?? [];
+            $instance = $labels['instance'] ?? '';
+            $job      = $labels['job'] ?? 'unknown';
+
+            if (empty($instance)) continue;
+
+            $jobLower = strtolower($job);
+            if (str_contains($jobLower, 'kube') || str_contains($jobLower, 'kubernetes')) continue;
+
+            $health = $target['health'] ?? 'unknown';
+            $hasUpSeries = array_key_exists($instance, $upMap);
+
+            if (!$hasUpSeries && !in_array($health, ['up', 'down'], true)) {
+                $alerts[] = [
+                    'id'       => md5('unknown_' . $instance),
+                    'severity' => 'warning',
+                    'type'     => 'unknown_status',
+                    'instance' => $instance,
+                    'message'  => "Status unknown / not yet scraped: {$job} @ {$instance}",
+                    'value'    => 0,
+                    'at'       => now()->toIso8601String(),
+                ];
+            }
+        }
+
+        $crashResult = $this->query('kube_pod_container_status_waiting_reason{reason="CrashLoopBackOff"} == 1');
         foreach ($crashResult as $item) {
             $pod = $item['metric']['pod'] ?? 'unknown';
             $ns  = $item['metric']['namespace'] ?? 'default';

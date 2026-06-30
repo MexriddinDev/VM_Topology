@@ -8,7 +8,7 @@ return [
     | The base URL of your Prometheus instance.
     | Default: http://localhost:9090
     */
-    'url' => env('PROMETHEUS_URL', 'http://localhost:9090'),
+    'url' => env('PROMETHEUS_URL', 'http://172.28.6.55:9090'),
 
     /*
     |--------------------------------------------------------------------------

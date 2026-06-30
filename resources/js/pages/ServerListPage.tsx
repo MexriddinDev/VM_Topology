@@ -9,7 +9,7 @@ const LAYER_LABELS: Record<VmLayer, string> = {
 };
 
 const STATUS_COLOR: Record<NodeStatus, string> = {
-    healthy: '#22c55e', warning: '#f59e0b', down: '#ef4444', unknown: '#6b7280',
+    up: '#22c55e', down: '#ef4444',
 };
 
 function MiniBar({ value, color }: { value: number; color: string }) {
@@ -55,8 +55,7 @@ export default function ServerListPage({ onServerClick }: { onServerClick: (id: 
                     className="rounded-xl border border-white/10 bg-[#1a2332] px-3 py-2 text-sm text-white/70 outline-none"
                 >
                     <option value="">All Status</option>
-                    <option value="healthy">Healthy</option>
-                    <option value="warning">Warning</option>
+                    <option value="healthy">UP</option>
                     <option value="down">Down</option>
                 </select>
 

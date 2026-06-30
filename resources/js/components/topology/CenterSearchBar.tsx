@@ -96,14 +96,12 @@ export default function CenterSearchBar({ allServers, canvasServerIds, onAdd }: 
                                         </div>
                                     </div>
                                     <div className="flex items-center gap-2 flex-shrink-0">
-                                        <span
-                                            className="w-2.5 h-2.5 rounded-full"
-                                            style={{
-                                                background:
-                                                    server.status === 'healthy' ? '#059669' :
-                                                    server.status === 'warning' ? '#d97706' : '#dc2626',
-                                            }}
-                                        />
+    <span
+        className="w-2.5 h-2.5 rounded-full"
+        style={{
+            background: server.status === 'up' ? '#059669' : '#ef4444',
+        }}
+    />
                                         <Plus size={18} className="text-emerald-600" />
                                     </div>
                                 </button>
