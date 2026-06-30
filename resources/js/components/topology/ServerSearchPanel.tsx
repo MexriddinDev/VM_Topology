@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { Search, Plus, Minus, X } from 'lucide-react';
-import type { Server } from '../../types';
+import type { Server, NodeStatus } from '../../types';
 import { useTheme } from '../../context/ThemeContext';
 
 interface Props {
@@ -30,15 +30,17 @@ export default function ServerSearchPanel({ allServers, canvasServerIds, onAdd, 
         ? 'bg-[rgba(10,12,22,0.95)] border-white/10 text-white'
         : 'bg-white/95 border-gray-200 text-gray-900 shadow-xl';
 
-    const statusDot = (status: string) => {
-        const colors: Record<string, string> = {
-            healthy: 'bg-green-500',
-            warning: 'bg-amber-500',
-            down: 'bg-red-500 animate-pulse',
-            unknown: 'bg-gray-400',
-        };
-        return colors[status] ?? colors.unknown;
+    // ✅ FIX: backend/Server type only ever returns 'up' | 'down' now
+    // (PrometheusService::buildVmList excludes 'unknown' instances
+    // entirely, they only show up as alerts). The old map referenced
+    // 'healthy' / 'warning' / 'unknown', none of which ever matched a real
+    // server.status value, so every live dot rendered as the gray fallback
+    // regardless of actual status.
+    const STATUS_DOT: Record<NodeStatus, string> = {
+        up: 'bg-green-500',
+        down: 'bg-red-500 animate-pulse',
     };
+    const statusDot = (status: NodeStatus) => STATUS_DOT[status] ?? 'bg-gray-400';
 
     if (!expanded) {
         return (

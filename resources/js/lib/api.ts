@@ -26,8 +26,23 @@ async function fetchJSON<T>(path: string, options?: RequestInit): Promise<T> {
 
     const json = await res.json();
 
-    // ✅ universal normalize
+    // universal normalize
     return (json.data ?? json.result ?? json) as T;
+}
+
+/**
+ * Normalizes a raw server status coming from the backend into the strict
+ * NodeStatus union ('up' | 'down').
+ *
+ * ✅ FIX: PrometheusService::buildVmList() now returns the status directly
+ * as 'up' or 'down' (it already excludes 'unknown' instances before they
+ * ever reach this endpoint). The old code here compared against the
+ * legacy value 'healthy', which the backend no longer sends — so every
+ * single server, even ones genuinely 'up', was being forced to 'down' in
+ * the UI. This was the root cause of servers looking permanently offline.
+ */
+function normalizeStatus(raw: unknown): 'up' | 'down' {
+    return raw === 'up' ? 'up' : 'down';
 }
 
 // ─── API Client ───────────────────────────────────────────────────────────────
@@ -50,10 +65,10 @@ export const api = {
             instance: s.instance ?? `${s.ip}:9100`,
             job: s.job ?? 'node',
             type: s.type ?? 'vm',
-            status: s.status === 'healthy' ? 'up' : 'down',
+            status: normalizeStatus(s.status),
 
-            cpu_percent: s.cpu_percent ?? 0,
-            ram_percent: s.ram_percent ?? 0,
+            cpu_percent: Number(s.cpu_percent ?? 0),
+            ram_percent: Number(s.ram_percent ?? 0),
 
             ip: s.ip,
             port: s.port ?? 9100,
@@ -137,7 +152,7 @@ export const api = {
     getAlerts: () => fetchJSON<Alert[]>('/alerts'),
 };
 
-// ─── Mock VM Specs ────────────────────────────────────────────────────────────
+// ─── Mock VM Specs (only used when VITE_USE_MOCK=true) ───────────────────────
 
 type VmStatus = 'healthy' | 'warning' | 'down';
 
@@ -152,38 +167,27 @@ interface VmSpec {
 }
 
 const DEMO_VM_SPECS: VmSpec[] = [
-    // Load balancers / API gateway
     { id: 'vm-01', name: 'nginx-lb-01',      ip: '10.20.1.10', status: 'healthy', layers: ['infra', 'app'],              cpu: 22, ram: 41 },
     { id: 'vm-02', name: 'api-gateway-01',   ip: '10.20.1.11', status: 'healthy', layers: ['infra', 'app'],              cpu: 38, ram: 55 },
     { id: 'vm-03', name: 'api-gateway-02',   ip: '10.20.1.12', status: 'warning', layers: ['infra', 'app'],              cpu: 81, ram: 72 },
     { id: 'vm-04', name: 'auth-svc-01',      ip: '10.20.1.13', status: 'healthy', layers: ['infra', 'app', 'redis'],     cpu: 29, ram: 48 },
-
-    // Databases
     { id: 'vm-05', name: 'postgres-primary', ip: '10.20.2.10', status: 'healthy', layers: ['infra', 'database'],         cpu: 18, ram: 62 },
     { id: 'vm-06', name: 'postgres-replica', ip: '10.20.2.11', status: 'healthy', layers: ['infra', 'database'],         cpu: 14, ram: 58 },
     { id: 'vm-07', name: 'redis-cache-01',   ip: '10.20.2.12', status: 'healthy', layers: ['infra', 'redis'],            cpu:  8, ram: 35 },
     { id: 'vm-08', name: 'redis-cache-02',   ip: '10.20.2.13', status: 'warning', layers: ['infra', 'redis'],            cpu: 76, ram: 88 },
-
-    // Workers / billing
     { id: 'vm-09', name: 'worker-batch-01',  ip: '10.20.3.10', status: 'healthy', layers: ['infra', 'app'],              cpu: 45, ram: 51 },
     { id: 'vm-10', name: 'worker-batch-02',  ip: '10.20.3.11', status: 'down',    layers: ['infra', 'app'],              cpu:  0, ram:  0 },
     { id: 'vm-11', name: 'worker-batch-03',  ip: '10.20.3.12', status: 'healthy', layers: ['infra', 'app'],              cpu: 33, ram: 44 },
     { id: 'vm-12', name: 'billing-svc-01',   ip: '10.20.3.13', status: 'healthy', layers: ['infra', 'app', 'database'],  cpu: 27, ram: 53 },
-
-    // Infra / observability
     { id: 'vm-13', name: 'monitor-01',       ip: '10.20.4.10', status: 'healthy', layers: ['infra'],                     cpu: 11, ram: 28 },
     { id: 'vm-14', name: 'vault-01',         ip: '10.20.4.11', status: 'healthy', layers: ['infra', 'app'],              cpu: 19, ram: 36 },
     { id: 'vm-15', name: 'kafka-broker-01',  ip: '10.20.4.12', status: 'warning', layers: ['infra', 'app'],              cpu: 68, ram: 79 },
     { id: 'vm-16', name: 'kafka-broker-02',  ip: '10.20.4.13', status: 'down',    layers: ['infra', 'app'],              cpu:  0, ram:  0 },
-
-    // Elastic / backup / jump
     { id: 'vm-17', name: 'elastic-01',       ip: '10.20.5.10', status: 'healthy', layers: ['infra', 'app', 'database'],  cpu: 42, ram: 67 },
     { id: 'vm-18', name: 'elastic-02',       ip: '10.20.5.11', status: 'healthy', layers: ['infra', 'app', 'database'],  cpu: 39, ram: 64 },
     { id: 'vm-19', name: 'backup-01',        ip: '10.20.5.12', status: 'down',    layers: ['infra'],                     cpu:  0, ram:  0 },
     { id: 'vm-20', name: 'jump-host-01',     ip: '10.20.5.13', status: 'healthy', layers: ['infra'],                     cpu:  5, ram: 18 },
 ];
-
-// ─── Mock Data Builders ───────────────────────────────────────────────────────
 
 function specToServer(spec: VmSpec): Server {
     const zone = spec.ip.split('.')[2];
@@ -194,18 +198,13 @@ function specToServer(spec: VmSpec): Server {
         instance: `${spec.ip}:9100`,
         job: 'node',
         type: 'vm',
-
-        // ✅ FIXED STATUS
-        status: spec.status === 'healthy' ? 'up' : 'down',
-
+        status: spec.status === 'healthy' || spec.status === 'warning' ? 'up' : 'down',
         cpu_percent: spec.cpu,
         ram_percent: spec.ram,
         ip: spec.ip,
         port: 9100,
-
         labels: { zone },
         layers: spec.layers,
-
         jobs: [
             'node',
             ...spec.layers
@@ -217,143 +216,52 @@ function specToServer(spec: VmSpec): Server {
 
 export const mockServers: Server[] = DEMO_VM_SPECS.map(specToServer);
 
-// ─── Mock Alerts ──────────────────────────────────────────────────────────────
-
 const NOW = new Date().toISOString();
 
 export const mockAlerts: Alert[] = [
-    {
-        id:       'a1',
-        severity: 'critical',
-        type:     'service_down',
-        instance: '10.20.3.11:9100',
-        message:  'OFFLINE: worker-batch-02',
-        value:    0,
-        at:       NOW,
-    },
-    {
-        id:       'a2',
-        severity: 'critical',
-        type:     'service_down',
-        instance: '10.20.4.13:9100',
-        message:  'OFFLINE: kafka-broker-02',
-        value:    0,
-        at:       NOW,
-    },
-    {
-        id:       'a3',
-        severity: 'critical',
-        type:     'service_down',
-        instance: '10.20.5.12:9100',
-        message:  'OFFLINE: backup-01',
-        value:    0,
-        at:       NOW,
-    },
-    {
-        id:       'a4',
-        severity: 'warning',
-        type:     'cpu_high',
-        instance: '10.20.1.12:9100',
-        message:  'High CPU: api-gateway-02 (81%)',
-        value:    81,
-        at:       NOW,
-    },
-    {
-        id:       'a5',
-        severity: 'warning',
-        type:     'ram_high',
-        instance: '10.20.2.13:9100',
-        message:  'High RAM: redis-cache-02 (88%)',
-        value:    88,
-        at:       NOW,
-    },
-    {
-        id:       'a6',
-        severity: 'warning',
-        type:     'cpu_high',
-        instance: '10.20.4.12:9100',
-        message:  'High CPU: kafka-broker-01 (68%)',
-        value:    68,
-        at:       NOW,
-    },
+    { id: 'a1', severity: 'critical', type: 'service_down', instance: '10.20.3.11:9100', message: 'OFFLINE: worker-batch-02', value: 0, at: NOW },
+    { id: 'a2', severity: 'critical', type: 'service_down', instance: '10.20.4.13:9100', message: 'OFFLINE: kafka-broker-02', value: 0, at: NOW },
+    { id: 'a3', severity: 'critical', type: 'service_down', instance: '10.20.5.12:9100', message: 'OFFLINE: backup-01', value: 0, at: NOW },
+    { id: 'a4', severity: 'warning', type: 'cpu_high', instance: '10.20.1.12:9100', message: 'High CPU: api-gateway-02 (81%)', value: 81, at: NOW },
+    { id: 'a5', severity: 'warning', type: 'ram_high', instance: '10.20.2.13:9100', message: 'High RAM: redis-cache-02 (88%)', value: 88, at: NOW },
+    { id: 'a6', severity: 'warning', type: 'cpu_high', instance: '10.20.4.12:9100', message: 'High CPU: kafka-broker-01 (68%)', value: 68, at: NOW },
 ];
-
-// ─── Mock Topologies ──────────────────────────────────────────────────────────
 
 export const mockTopologies: TopologyDashboard[] = [
-    {
-        id:          1,
-        name:        'Production Network',
-        description: '20 VM production topology',
-        is_default:  true,
-        sort_order:  0,
-        node_count:  20,
-        edge_count:  24,
-        updated_at:  NOW,
-    },
-    {
-        id:          2,
-        name:        'Staging Cluster',
-        description: 'Staging environment',
-        is_default:  false,
-        sort_order:  1,
-        node_count:  0,
-        edge_count:  0,
-        updated_at:  NOW,
-    },
+    { id: 1, name: 'Production Network', description: '20 VM production topology', is_default: true, sort_order: 0, node_count: 20, edge_count: 24, updated_at: NOW },
+    { id: 2, name: 'Staging Cluster', description: 'Staging environment', is_default: false, sort_order: 1, node_count: 0, edge_count: 0, updated_at: NOW },
 ];
 
-// ─── Mock Topology Edges ──────────────────────────────────────────────────────
-
 const DEMO_EDGES: TopologyLayout['edges'] = [
-    // LB → gateways
     { id: 'e01', source: 'vm-01', target: 'vm-02', animated: true, label: 'HTTP' },
     { id: 'e02', source: 'vm-02', target: 'vm-03', animated: true },
     { id: 'e03', source: 'vm-02', target: 'vm-04', animated: true, label: 'Auth' },
-    // Auth → cache
     { id: 'e04', source: 'vm-04', target: 'vm-07', animated: true, label: 'Cache' },
-    // Gateway → DB
     { id: 'e05', source: 'vm-03', target: 'vm-05', animated: true, label: 'SQL' },
-    // DB replication
     { id: 'e06', source: 'vm-05', target: 'vm-06', animated: true, label: 'Repl' },
-    // Redis cluster
     { id: 'e07', source: 'vm-07', target: 'vm-08', animated: true },
-    // Workers
     { id: 'e08', source: 'vm-09', target: 'vm-10', animated: true },
     { id: 'e09', source: 'vm-09', target: 'vm-11', animated: true },
     { id: 'e10', source: 'vm-11', target: 'vm-12', animated: true, label: 'API' },
     { id: 'e11', source: 'vm-12', target: 'vm-05', animated: true, label: 'DB' },
-    // LB → workers
     { id: 'e12', source: 'vm-01', target: 'vm-09', animated: true, label: 'Proxy' },
-    // Monitoring
     { id: 'e13', source: 'vm-13', target: 'vm-17', animated: true },
     { id: 'e14', source: 'vm-17', target: 'vm-18', animated: true, label: 'Cluster' },
-    // Kafka
     { id: 'e15', source: 'vm-15', target: 'vm-16', animated: true },
     { id: 'e16', source: 'vm-15', target: 'vm-11', animated: true, label: 'Events' },
-    // Vault → auth
     { id: 'e17', source: 'vm-14', target: 'vm-04', animated: true },
-    // Backup → DB
     { id: 'e18', source: 'vm-19', target: 'vm-05', animated: true, label: 'Backup' },
-    // Jump host
     { id: 'e19', source: 'vm-20', target: 'vm-01', animated: true, label: 'SSH' },
-    // Gateway → kafka
     { id: 'e20', source: 'vm-03', target: 'vm-15', animated: true },
-    // Replica → billing
     { id: 'e21', source: 'vm-06', target: 'vm-12', animated: true },
-    // Redis → auth
     { id: 'e22', source: 'vm-08', target: 'vm-04', animated: true },
-    // Down worker → down kafka (for visual context)
     { id: 'e23', source: 'vm-10', target: 'vm-16', animated: false },
-    // Elastic → monitor
     { id: 'e24', source: 'vm-18', target: 'vm-13', animated: true, label: 'Logs' },
 ];
 
-// ─── Topology Builder ─────────────────────────────────────────────────────────
-
 /**
  * Lays out servers in a 5-column grid.
- * topologyId=1 → full 20-node production topology
+ * topologyId=1 → full 20-node production topology (mock mode only)
  * topologyId=2 → empty staging topology
  */
 export function buildMockTopology(topologyId = 1): TopologyLayout {
@@ -378,12 +286,9 @@ export function buildMockTopology(topologyId = 1): TopologyLayout {
     };
 }
 
-// ─── Mock Metrics ─────────────────────────────────────────────────────────────
-
 export function mockMetrics(server: Server): ServerMetrics {
     const layers  = server.layers ?? ['infra'];
     const alive   = server.status !== 'down';
-
 
     const GB = 1024 ** 3;
     const MB = 1024 ** 2;
@@ -391,7 +296,6 @@ export function mockMetrics(server: Server): ServerMetrics {
     return {
         server,
         layers,
-
         infra: {
             cpu_percent:      server.cpu_percent,
             memory_percent:   server.ram_percent,
@@ -405,7 +309,6 @@ export function mockMetrics(server: Server): ServerMetrics {
             load1:            alive ? server.cpu_percent / 30 : 0,
             uptime_seconds:   alive ? 864_321 : 0,
         },
-
         app: layers.includes('app')
             ? {
                 requests_per_sec: alive ? 142.3 : 0,
@@ -416,7 +319,6 @@ export function mockMetrics(server: Server): ServerMetrics {
                 errors_4xx_sec:   alive ? 3.2 : 0,
             }
             : null,
-
         database: layers.includes('database')
             ? {
                 connections:       alive ? 47 : 0,
@@ -434,13 +336,10 @@ export function mockMetrics(server: Server): ServerMetrics {
                 evictions_sec: alive ? 0 : 0,
             }
             : null,
-
         docker:     null,
         kubernetes: null,
     };
 }
-
-// ─── In-memory Topology Store (mock persistence) ──────────────────────────────
 
 const topologyStore = new Map<number, TopologyLayout>([
     [1, buildMockTopology(1)],

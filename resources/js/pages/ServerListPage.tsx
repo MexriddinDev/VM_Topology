@@ -26,6 +26,10 @@ function MiniBar({ value, color }: { value: number; color: string }) {
 
 export default function ServerListPage({ onServerClick }: { onServerClick: (id: string) => void }) {
     const [search, setSearch] = useState('');
+    // ✅ FIX: values now match the real NodeStatus union ('up' | 'down').
+    // Previously this used 'healthy', which never matched server.status
+    // ('up'/'down' coming from the backend), so the filter silently did
+    // nothing — selecting "UP" always returned 0 rows.
     const [statusFilter, setStatusFilter] = useState<NodeStatus | ''>('');
 
     const { servers, loading } = useServers({
@@ -55,7 +59,7 @@ export default function ServerListPage({ onServerClick }: { onServerClick: (id: 
                     className="rounded-xl border border-white/10 bg-[#1a2332] px-3 py-2 text-sm text-white/70 outline-none"
                 >
                     <option value="">All Status</option>
-                    <option value="healthy">UP</option>
+                    <option value="up">UP</option>
                     <option value="down">Down</option>
                 </select>
 
