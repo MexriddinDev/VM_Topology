@@ -27,11 +27,11 @@ const STATUS: Record<string, {
         dotPulse:  true,
     },
     warning: {
-        accent:    '#f59e0b',
-        accentDim: '#f59e0b22',
-        accentGlow:'#f59e0b55',
-        label:     'DEGRADED',
-        dotPulse:  false,
+        accent:    '#22c55e',
+        accentDim: '#22c55e22',
+        accentGlow:'#22c55e55',
+        label:     'UP',
+        dotPulse:  true,
     },
     down: {
         accent:    '#C72F12',

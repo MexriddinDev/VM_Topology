@@ -43,6 +43,8 @@ export default function App() {
 
     const downCount = servers.filter((s) => s.status === 'down').length;
     const criticalCount = alerts.filter((a) => a.severity === 'critical').length;
+    const pageSubtitle =
+        page === 'topology' ? 'Visual map' : page === 'servers' ? 'VM inventory' : 'Incident feed';
 
     const handleCreateTopology = async (name: string) => {
         const created = await createTopology(name);
@@ -63,34 +65,45 @@ export default function App() {
 
     return (
         <div className={`flex h-screen w-screen overflow-hidden ${textH}`} style={{ background: shellBg }}>
-            <Sidebar page={page} setPage={setPage} alertCount={alerts.length} isDark={isDark} />
+            <Sidebar page={page} setPage={setPage} alertCount={alerts.length} />
 
             <div className="flex-1 flex flex-col min-w-0">
                 <header
-                    className="flex items-center gap-4 px-6 py-3.5 flex-shrink-0 border-b"
-                    style={{ background: barBg, borderColor: barBorder }}
+                    className="flex items-center gap-4 flex-shrink-0 border-b px-6 py-4"
+                    style={{ background: isDark ? '#0b1220' : barBg, borderColor: isDark ? '#243047' : barBorder }}
                 >
-                    <span className={`text-sm font-bold uppercase tracking-widest ${textM}`}>
-                        {page === 'topology' ? 'Network Topology' : page === 'servers' ? 'VM Inventory' : 'Alerts'}
-                    </span>
+                    <div className="flex items-center gap-3">
+                        <div className="rounded-2xl border border-cyan-400/20 bg-cyan-500/10 px-3 py-2">
+                            <div className="text-[10px] font-black uppercase tracking-[0.35em] text-cyan-400">Panel</div>
+                            <div className="mt-1 text-sm font-black text-white">
+                                {page === 'topology' ? 'Topology' : page === 'servers' ? 'Servers' : 'Alerts'}
+                            </div>
+                        </div>
+                        <div className="hidden text-sm text-slate-400 md:block">{pageSubtitle}</div>
+                    </div>
+
                     <div className="flex-1" />
 
                     {downCount > 0 && (
-                        <span className="flex items-center gap-2 px-4 py-1.5 rounded-lg bg-red-500/10 border border-red-500/30 text-red-600 text-sm font-bold">
-                            <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+                        <span className="flex items-center gap-2 rounded-2xl border border-red-500/40 bg-[#2a1515] px-4 py-2 text-sm font-bold text-red-400">
+                            <span className="h-2 w-2 rounded-full bg-red-500 animate-pulse" />
                             {downCount} offline
                         </span>
                     )}
                     {criticalCount > 0 && (
-                        <span className="px-4 py-1.5 rounded-lg bg-red-500/10 text-red-600 text-sm font-bold">
+                        <span className="rounded-2xl border border-red-500/40 bg-[#2a1515] px-4 py-2 text-sm font-bold text-red-400">
                             {criticalCount} critical
                         </span>
                     )}
-                    <span className={`text-sm font-medium ${textM}`}>{servers.length} VMs</span>
+                    <span className="rounded-2xl border border-emerald-500/30 bg-[#10251a] px-4 py-2 text-sm font-bold text-emerald-400">
+                        {servers.length} VMs
+                    </span>
 
                     <button
                         onClick={toggleTheme}
-                        className={`w-10 h-10 rounded-lg border flex items-center justify-center ${isDark ? 'border-slate-700 text-slate-300' : 'border-slate-200 text-slate-600'}`}
+                        className={`flex h-11 w-11 items-center justify-center rounded-2xl border ${
+                            isDark ? 'border-slate-600 bg-[#111827] text-slate-200' : 'border-slate-200 bg-white text-slate-600'
+                        }`}
                     >
                         {isDark ? <Sun size={18} /> : <Moon size={18} />}
                     </button>
@@ -104,6 +117,12 @@ export default function App() {
                         onCreate={handleCreateTopology}
                         onDelete={deleteTopology}
                         onLink={handleLinkTopologies}
+                        allServers={servers}
+                        canvasServerIds={new Set<string>()}
+                        onAddServer={(server) => {
+                            if (page !== 'topology') setPage('topology');
+                            window.dispatchEvent(new CustomEvent('topology:add-server', { detail: server }));
+                        }}
                     />
                 )}
 

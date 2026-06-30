@@ -48,9 +48,9 @@ export default function CenterSearchBar({ allServers, canvasServerIds, onAdd }: 
         : 'bg-white border-slate-200 shadow-xl';
 
     return (
-        <div ref={ref} className="absolute top-4 left-1/2 -translate-x-1/2 z-30 w-full max-w-xl px-4">
+        <div ref={ref} className="absolute top-1 left-1/2 z-30 w-full max-w-2xl -translate-x-1/2 px-4">
             <div className="relative">
-                <div className={`flex items-center gap-3 px-5 py-3.5 rounded-2xl border-2 ${inputCls}`}>
+                <div className={`flex items-center gap-3 rounded-2xl border-2 px-5 py-3.5 ${inputCls}`}>
                     <Search size={20} className="flex-shrink-0 opacity-50" />
                     <input
                         value={query}
@@ -65,7 +65,7 @@ export default function CenterSearchBar({ allServers, canvasServerIds, onAdd }: 
                 </div>
 
                 {open && query.trim().length >= 2 && (
-                    <div className={`absolute top-full left-0 right-0 mt-2 rounded-xl border overflow-hidden ${dropdownCls}`}>
+                    <div className={`absolute left-0 right-0 top-full mt-2 overflow-hidden rounded-2xl border ${dropdownCls}`}>
                         {results.length === 0 ? (
                             <div className={`px-5 py-6 text-center text-sm ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
                                 No matching VMs found in Prometheus

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Search, Filter, Cpu, MemoryStick, Circle } from 'lucide-react';
+import { Search } from 'lucide-react';
 import type { Server, NodeStatus, VmLayer } from '../types';
 import { useServers } from '../hooks/useInfraData';
 
@@ -34,27 +34,25 @@ export default function ServerListPage({ onServerClick }: { onServerClick: (id: 
     });
 
     return (
-        <div className="flex-1 flex flex-col h-full p-6 overflow-hidden">
+        <div className="flex-1 flex flex-col h-full overflow-hidden bg-[#141414] p-6">
             {/* Filters */}
-            <div className="flex items-center gap-3 mb-5 flex-shrink-0">
+            <div className="mb-5 flex flex-shrink-0 items-center gap-3">
                 <div
-                    className="flex items-center gap-2 flex-1 max-w-xs px-3 py-2 rounded-xl"
-                    style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)' }}
+                    className="flex flex-1 max-w-xs items-center gap-2 rounded-xl border border-white/10 bg-[#1a2332] px-3 py-2"
                 >
                     <Search size={14} className="text-white/30" />
                     <input
                         value={search}
                         onChange={e => setSearch(e.target.value)}
                         placeholder="Search servers..."
-                        className="bg-transparent text-sm text-white placeholder-white/30 outline-none w-full"
+                        className="w-full bg-transparent text-sm text-white placeholder-white/30 outline-none"
                     />
                 </div>
 
                 <select
                     value={statusFilter}
                     onChange={e => setStatusFilter(e.target.value as NodeStatus | '')}
-                    className="px-3 py-2 rounded-xl text-sm text-white/70 outline-none"
-                    style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)' }}
+                    className="rounded-xl border border-white/10 bg-[#1a2332] px-3 py-2 text-sm text-white/70 outline-none"
                 >
                     <option value="">All Status</option>
                     <option value="healthy">Healthy</option>
@@ -62,19 +60,16 @@ export default function ServerListPage({ onServerClick }: { onServerClick: (id: 
                     <option value="down">Down</option>
                 </select>
 
-                <div className="text-white/30 text-sm ml-auto">
+                <div className="ml-auto text-sm text-white/30">
                     {servers.length} server{servers.length !== 1 ? 's' : ''}
                 </div>
             </div>
 
             {/* Table */}
-            <div
-                className="flex-1 overflow-hidden rounded-2xl"
-                style={{ border: '1px solid rgba(255,255,255,0.07)' }}
-            >
+            <div className="flex-1 overflow-hidden rounded-2xl border border-white/10 bg-[#0f1419]">
                 {/* Header */}
                 <div
-                    className="grid text-[10px] font-bold uppercase tracking-widest text-white/30 px-4 py-2.5"
+                    className="grid px-4 py-2.5 text-[10px] font-bold uppercase tracking-widest text-white/30"
                     style={{
                         gridTemplateColumns: '1fr 80px 100px 130px 130px 100px',
                         background: 'rgba(255,255,255,0.03)',
@@ -91,13 +86,13 @@ export default function ServerListPage({ onServerClick }: { onServerClick: (id: 
 
                 <div className="overflow-y-auto h-full pb-12">
                     {loading && (
-                        <div className="flex items-center justify-center py-20 text-white/30 text-sm">
+                        <div className="flex items-center justify-center py-20 text-sm text-white/30">
                             Loading servers...
                         </div>
                     )}
 
                     {!loading && servers.length === 0 && (
-                        <div className="flex items-center justify-center py-20 text-white/20 text-sm">
+                        <div className="flex items-center justify-center py-20 text-sm text-white/20">
                             No servers found
                         </div>
                     )}
@@ -109,24 +104,24 @@ export default function ServerListPage({ onServerClick }: { onServerClick: (id: 
                             animate={{ opacity: 1, y: 0 }}
                             transition={{ delay: i * 0.03 }}
                             onClick={() => onServerClick(server.id)}
-                            className="grid items-center px-4 py-3 cursor-pointer transition-all group"
+                            className="group grid cursor-pointer items-center px-4 py-3 transition-all"
                             style={{
                                 gridTemplateColumns: '1fr 80px 100px 130px 130px 100px',
                                 borderBottom: '1px solid rgba(255,255,255,0.04)',
                             }}
-                            whileHover={{ background: 'rgba(99,102,241,0.06)' }}
+                            whileHover={{ background: 'rgba(34,197,94,0.04)' }}
                         >
                             <div className="flex items-center gap-3 min-w-0">
                                 <span className="text-base">🖥</span>
                                 <div className="min-w-0">
-                                    <div className="text-sm text-white font-medium truncate group-hover:text-indigo-300 transition-colors">
+                                    <div className="truncate text-sm font-medium text-white transition-colors group-hover:text-cyan-300">
                                         {server.name}
                                     </div>
                                     <div className="text-[10px] text-white/30 font-mono">{server.job}</div>
                                 </div>
                             </div>
 
-                            <span className="text-[10px] text-white/40 uppercase">
+                            <span className="text-[10px] uppercase text-white/40">
                                 {(server.layers ?? ['infra']).map((l) => LAYER_LABELS[l] ?? l).join(', ')}
                             </span>
 

@@ -10,18 +10,17 @@ const LAYER_CONFIG: Record<VmLayer, { label: string; sub: string; Icon: typeof C
     redis:    { label: 'Cache', sub: 'Redis', Icon: Zap },
 };
 
-function layerStatus(metrics: ServerMetrics, layer: VmLayer): 'up' | 'down' | 'warn' | 'na' {
+function layerStatus(metrics: ServerMetrics, layer: VmLayer): 'up' | 'down' | 'na' {
     const vmDown = metrics.server.status === 'down';
 
     switch (layer) {
         case 'infra':
             if (vmDown) return 'down';
-            if (metrics.server.status === 'warning') return 'warn';
             return 'up';
         case 'app':
             if (!metrics.layers.includes('app')) return 'na';
             if (vmDown || !metrics.app) return 'down';
-            if (metrics.app.error_rate_5xx > 5) return 'warn';
+            if (metrics.app.error_rate_5xx > 5) return 'down';
             return 'up';
         case 'database':
             if (!metrics.layers.includes('database')) return 'na';
@@ -39,7 +38,6 @@ function layerStatus(metrics: ServerMetrics, layer: VmLayer): 'up' | 'down' | 'w
 const STATUS_STYLE = {
     up:   { dot: '#059669', border: '#059669', bg: 'rgba(5,150,105,0.08)', text: 'OPERATIONAL' },
     down: { dot: '#dc2626', border: '#dc2626', bg: 'rgba(220,38,38,0.08)', text: 'OFFLINE' },
-    warn: { dot: '#d97706', border: '#d97706', bg: 'rgba(217,119,6,0.08)', text: 'DEGRADED' },
     na:   { dot: '#94a3b8', border: '#cbd5e1', bg: 'rgba(148,163,184,0.06)', text: 'NOT DETECTED' },
 };
 

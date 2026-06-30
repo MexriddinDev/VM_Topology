@@ -12,14 +12,12 @@ export default function StatusOverviewBar({ nodes, onFilterStatus, activeFilter 
     const { isDark } = useTheme();
 
     const counts = {
-        healthy: nodes.filter((n) => n.status === 'healthy').length,
-        warning: nodes.filter((n) => n.status === 'warning').length,
+        healthy: nodes.filter((n) => n.status !== 'down').length,
         down: nodes.filter((n) => n.status === 'down').length,
     };
 
     const items = [
         { key: 'healthy', label: 'Online', count: counts.healthy, color: '#16a34a', bg: isDark ? '#0a1f12' : '#f0fdf4' },
-        { key: 'warning', label: 'Degraded', count: counts.warning, color: '#ca8a04', bg: isDark ? '#1f1a0a' : '#fefce8' },
         { key: 'down', label: 'Offline', count: counts.down, color: '#dc2626', bg: isDark ? '#1f0a0a' : '#fef2f2' },
     ];
 

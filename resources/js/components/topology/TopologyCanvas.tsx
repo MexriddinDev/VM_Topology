@@ -20,7 +20,6 @@ import 'reactflow/dist/style.css';
 import { Cloud, Check, Loader2, AlertTriangle } from 'lucide-react';
 
 import InfraNode from '../nodes/InfraNode';
-import CenterSearchBar from './CenterSearchBar';
 import StatusOverviewBar from './StatusOverviewBar';
 import type { TopologyLayout, TopologyNode, Server } from '../../types';
 import { useTopology, USE_MOCK } from '../../hooks/useInfraData';
@@ -28,24 +27,24 @@ import { useTheme } from '../../context/ThemeContext';
 
 const NODE_TYPES = { infraNode: InfraNode };
 
-function edgeStroke(sourceStatus?: string, targetStatus?: string, isDark?: boolean): string {
-    if (sourceStatus === 'down' || targetStatus === 'down') return '#dc2626';
-    if (sourceStatus === 'warning' || targetStatus === 'warning') return '#ca8a04';
-    return isDark ? '#525252' : '#737373';
+function edgeStroke(sourceStatus?: string, targetStatus?: string): string {
+    if (sourceStatus === 'down') return '#dc2626';
+    if (targetStatus === 'down') return '#dc2626';
+    return '#16a34a';
 }
 
-function buildEdge(e: TopologyLayout['edges'][0], isDark: boolean, nodeMap: Map<string, Server>): Edge {
+function buildEdge(e: TopologyLayout['edges'][0], nodeMap: Map<string, Server>): Edge {
     const src = nodeMap.get(e.source)?.status;
     const tgt = nodeMap.get(e.target)?.status;
-    const stroke = edgeStroke(src, tgt, isDark);
-    const isBad = src === 'down' || tgt === 'down';
+    const stroke = edgeStroke(src, tgt);
+    const isBad = src === 'down';
 
     return {
         ...e,
         sourceHandle: e.sourceHandle,
         targetHandle: e.targetHandle,
-        animated: !isBad,
-        style: { stroke, strokeWidth: isBad ? 3 : 2.5, opacity: isBad ? 1 : 0.85 },
+        animated: true,
+        style: { stroke, strokeWidth: isBad ? 3 : 2.5, opacity: 1 },
         markerEnd: {
             type: MarkerType.ArrowClosed,
             color: stroke,
@@ -89,7 +88,7 @@ function TopologyCanvasInner({ topologyId, onNodeClick, liveServers, allServers 
                 data: n.data,
             }))
         );
-        setEdges(topology.edges.map((e) => buildEdge(e, isDark, nodeMap)));
+        setEdges(topology.edges.map((e) => buildEdge(e, nodeMap)));
         setInitialized(true);
         isDirty.current = false;
         setTimeout(() => { loadingRef.current = false; }, 100);
@@ -164,10 +163,12 @@ function TopologyCanvasInner({ topologyId, onNodeClick, liveServers, allServers 
 
     const visibleNodes = useMemo(() => {
         if (!statusFilter) return nodes;
+        const isOnlineFilter = statusFilter === 'healthy';
+        const isDownFilter = statusFilter === 'down';
         return nodes.map((n) => ({
             ...n,
-            hidden: n.data.status !== statusFilter,
-            style: n.data.status !== statusFilter ? { opacity: 0.12 } : undefined,
+            hidden: isOnlineFilter ? n.data.status === 'down' : isDownFilter ? n.data.status !== 'down' : false,
+            style: isOnlineFilter ? (n.data.status === 'down' ? { opacity: 0.12 } : undefined) : (isDownFilter && n.data.status !== 'down' ? { opacity: 0.12 } : undefined),
         }));
     }, [nodes, statusFilter]);
 
@@ -217,6 +218,17 @@ function TopologyCanvasInner({ topologyId, onNodeClick, liveServers, allServers 
         [canvasServerIds, nodes.length, scheduleSave, setNodes]
     );
 
+    useEffect(() => {
+        const handler = (event: Event) => {
+            const custom = event as CustomEvent<Server>;
+            if (!custom.detail) return;
+            handleAddServer(custom.detail);
+        };
+
+        window.addEventListener('topology:add-server', handler);
+        return () => window.removeEventListener('topology:add-server', handler);
+    }, [handleAddServer]);
+
     const handleRemoveServer = useCallback(
         (serverId: string) => {
             setNodes((nds) => nds.filter((n) => n.id !== serverId));
@@ -248,12 +260,6 @@ function TopologyCanvasInner({ topologyId, onNodeClick, liveServers, allServers 
             />
 
             <div className="flex-1 relative min-h-0">
-                <CenterSearchBar
-                    allServers={allServers}
-                    canvasServerIds={canvasServerIds}
-                    onAdd={handleAddServer}
-                />
-
                 <ReactFlow
                     nodes={visibleNodes}
                     edges={edges}
@@ -285,10 +291,8 @@ function TopologyCanvasInner({ topologyId, onNodeClick, liveServers, allServers 
                     <MiniMap
                         nodeColor={(n) => {
                             const s = (n.data as Server)?.status;
-                            if (s === 'healthy') return '#059669';
-                            if (s === 'warning') return '#d97706';
                             if (s === 'down') return '#dc2626';
-                            return '#94a3b8';
+                            return '#16a34a';
                         }}
                         maskColor={isDark ? 'rgba(15,20,25,0.75)' : 'rgba(232,237,243,0.85)'}
                         className={isDark ? '!bg-slate-900/90 !border-slate-700' : '!bg-white/90 !border-slate-200'}
@@ -302,7 +306,7 @@ function TopologyCanvasInner({ topologyId, onNodeClick, liveServers, allServers 
                         >
                             {USE_MOCK ? (
                                 <>
-                                    <span className="w-2 h-2 rounded-full bg-amber-500" />
+                                    <span className="w-2 h-2 rounded-full bg-emerald-500" />
                                     Demo — 20 statik VM
                                 </>
                             ) : (

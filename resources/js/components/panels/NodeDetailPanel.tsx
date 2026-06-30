@@ -49,6 +49,11 @@ export default function NodeDetailPanel({ serverId, onClose }: Props) {
     const border = isDark ? '#2d3a4f' : '#e2e8f0';
     const textH = isDark ? 'text-slate-100' : 'text-slate-900';
     const textM = isDark ? 'text-slate-400' : 'text-slate-600';
+    const statusTone =
+        status === 'healthy' ? { bg: '#0f2a1c', border: '#16a34a55', text: '#4ade80' } :
+        status === 'warning' ? { bg: '#1f2a0f', border: '#84cc1655', text: '#a3e635' } :
+        status === 'down' ? { bg: '#2a1515', border: '#ef444455', text: '#f87171' } :
+        { bg: '#111827', border: '#334155', text: '#cbd5e1' };
 
     return (
         <AnimatePresence>
@@ -61,39 +66,50 @@ export default function NodeDetailPanel({ serverId, onClose }: Props) {
                     className="fixed inset-0 z-50 flex flex-col"
                     style={{ background: bg }}
                 >
-                    {/* Header */}
                     <header
-                        className="flex items-center gap-4 px-8 py-5 border-b flex-shrink-0"
+                        className="flex flex-shrink-0 items-center gap-4 border-b px-6 py-4 lg:px-8"
                         style={{
-                            background: isDown ? (isDark ? '#2a1515' : '#fef2f2') : card,
-                            borderColor: isDown ? '#dc2626' : border,
+                            background: isDark ? '#0b1220' : card,
+                            borderColor: isDark ? '#243047' : border,
                         }}
                     >
                         <button
                             onClick={onClose}
-                            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl border text-base font-semibold ${isDark ? 'border-slate-700 text-slate-300 hover:bg-slate-800' : 'border-slate-200 text-slate-700 hover:bg-slate-50'}`}
+                            className={`flex items-center gap-2 rounded-2xl border px-4 py-2.5 text-sm font-bold uppercase tracking-[0.2em] ${isDark ? 'border-slate-700 bg-[#111827] text-slate-300 hover:bg-slate-800' : 'border-slate-200 text-slate-700 hover:bg-slate-50'}`}
                         >
-                            <ArrowLeft size={20} /> Back to topology
+                            <ArrowLeft size={18} /> Back
                         </button>
 
+                        <div className="min-w-0 flex-1">
+                            {metrics && (
+                                <>
+                                    <div className="text-[10px] font-black uppercase tracking-[0.35em] text-cyan-400">Server detail</div>
+                                    <h1 className={`truncate text-2xl font-black lg:text-3xl ${textH}`}>{metrics.server.name}</h1>
+                                    <p className={`mt-0.5 font-mono text-sm lg:text-base ${textM}`}>{metrics.server.ip}:{metrics.server.port}</p>
+                                </>
+                            )}
+                        </div>
+
                         {metrics && (
-                            <div className="flex-1 min-w-0">
-                                <h1 className={`text-2xl font-black truncate ${textH}`}>{metrics.server.name}</h1>
-                                <p className={`text-lg font-mono mt-0.5 ${textM}`}>{metrics.server.ip}:{metrics.server.port}</p>
+                            <div
+                                className="hidden items-center gap-2 rounded-2xl border px-4 py-2.5 text-sm font-black uppercase tracking-wide xl:flex"
+                                style={{ background: statusTone.bg, borderColor: statusTone.border, color: statusTone.text }}
+                            >
+                                {isDown && <AlertOctagon size={18} />}
+                                {status}
                             </div>
                         )}
 
                         {metrics && (
-                            <div
-                                className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-base font-black uppercase tracking-wide ${
-                                    status === 'healthy' ? 'bg-emerald-500/15 text-emerald-600' :
-                                    status === 'warning' ? 'bg-amber-500/15 text-amber-600' :
-                                    status === 'down' ? 'bg-red-500/15 text-red-600 animate-pulse' :
-                                    'bg-slate-500/15 text-slate-500'
-                                }`}
-                            >
-                                {isDown && <AlertOctagon size={22} />}
-                                {status}
+                            <div className="hidden items-center gap-2 lg:flex">
+                                <div className="rounded-2xl border border-slate-700 bg-[#111827] px-4 py-2 text-right">
+                                    <div className="text-[10px] font-bold uppercase tracking-[0.25em] text-slate-500">CPU</div>
+                                    <div className="font-mono text-lg font-black text-white">{metrics.infra.cpu_percent.toFixed(1)}%</div>
+                                </div>
+                                <div className="rounded-2xl border border-slate-700 bg-[#111827] px-4 py-2 text-right">
+                                    <div className="text-[10px] font-bold uppercase tracking-[0.25em] text-slate-500">RAM</div>
+                                    <div className="font-mono text-lg font-black text-white">{metrics.infra.memory_percent.toFixed(1)}%</div>
+                                </div>
                             </div>
                         )}
 
@@ -109,87 +125,142 @@ export default function NodeDetailPanel({ serverId, onClose }: Props) {
                     )}
 
                     {!loading && metrics && (
-                        <div className="flex-1 overflow-y-auto p-8 scrollbar-thin">
-                            <div className="max-w-7xl mx-auto grid grid-cols-1 xl:grid-cols-2 gap-8">
-                                {/* Left: internal topology + layers */}
-                                <div className="space-y-6">
-                                    <VmLayerTopology metrics={metrics} />
-
-                                    <div className="rounded-2xl p-6 border" style={{ background: card, borderColor: border }}>
-                                        <div className="flex items-center gap-3 mb-4">
-                                            <Layers size={22} className="text-slate-500" />
-                                            <h2 className={`text-xl font-bold ${textH}`}>Active Exporters</h2>
+                        <div className="flex-1 overflow-y-auto p-4 lg:p-6">
+                            <div className="mx-auto max-w-[1600px] space-y-6">
+                                <div className="grid grid-cols-2 gap-4 xl:grid-cols-4">
+                                    {[
+                                        { label: 'CPU load', value: `${metrics.infra.cpu_percent.toFixed(1)}%`, hint: 'System compute', tone: 'green' },
+                                        { label: 'Memory', value: `${metrics.infra.memory_percent.toFixed(1)}%`, hint: 'Active usage', tone: 'green' },
+                                        { label: 'Disk', value: `${metrics.infra.disk_percent.toFixed(1)}%`, hint: 'Volume pressure', tone: 'green' },
+                                        { label: 'Uptime', value: formatUptime(metrics.infra.uptime_seconds), hint: 'Live host time', tone: 'cyan' },
+                                    ].map((item) => (
+                                        <div key={item.label} className="rounded-3xl border border-slate-700 bg-[#0f172a] p-5 shadow-[0_20px_60px_rgba(0,0,0,0.25)]">
+                                            <div className="text-[10px] font-black uppercase tracking-[0.35em] text-slate-500">{item.label}</div>
+                                            <div className={`mt-3 text-3xl font-black ${item.tone === 'cyan' ? 'text-cyan-300' : 'text-white'}`}>{item.value}</div>
+                                            <div className="mt-2 text-sm text-slate-400">{item.hint}</div>
                                         </div>
-                                        <div className="grid grid-cols-2 gap-3">
-                                            {(metrics.layers as VmLayer[]).map((layer) => (
-                                                <div
-                                                    key={layer}
-                                                    className={`px-4 py-3 rounded-xl border text-base font-semibold capitalize ${isDark ? 'border-slate-700 text-slate-200' : 'border-slate-200 text-slate-800'}`}
-                                                >
-                                                    {layer}
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </div>
+                                    ))}
                                 </div>
 
-                                {/* Right: metrics */}
-                                <div className="space-y-6">
-                                    <div className="rounded-2xl p-6 border" style={{ background: card, borderColor: border }}>
-                                        <div className="flex items-center gap-3 mb-6">
-                                            <Cpu size={22} className="text-slate-500" />
-                                            <h2 className={`text-xl font-bold ${textH}`}>Infrastructure Metrics</h2>
+                                <div className="grid grid-cols-1 gap-6 xl:grid-cols-12">
+                                    <div className="space-y-6 xl:col-span-7">
+                                        <VmLayerTopology metrics={metrics} />
+
+                                        <div className="rounded-3xl border border-slate-700 bg-[#0f172a] p-6 shadow-[0_20px_60px_rgba(0,0,0,0.25)]">
+                                            <div className="mb-4 flex items-center gap-3">
+                                                <Layers size={22} className="text-cyan-400" />
+                                                <h2 className={`text-xl font-black ${textH}`}>Active Exporters</h2>
+                                            </div>
+                                            <div className="grid grid-cols-2 gap-3">
+                                                {(metrics.layers as VmLayer[]).map((layer) => (
+                                                    <div
+                                                        key={layer}
+                                                        className="rounded-2xl border border-slate-700 bg-[#111827] px-4 py-3 text-sm font-semibold capitalize text-slate-200"
+                                                    >
+                                                        {layer}
+                                                    </div>
+                                                ))}
+                                            </div>
                                         </div>
-                                        <div className="grid grid-cols-2 gap-6 mb-6">
-                                            <MetricGauge label="CPU" value={metrics.infra.cpu_percent} warn={80} crit={90} size="lg" />
-                                            <MetricGauge label="Memory" value={metrics.infra.memory_percent} warn={85} crit={95} size="lg" />
+
+                                        <div className="rounded-3xl border border-slate-700 bg-[#0f172a] p-6 shadow-[0_20px_60px_rgba(0,0,0,0.25)]">
+                                            <div className="mb-4 flex items-center gap-3">
+                                                <Activity size={22} className="text-emerald-400" />
+                                                <h2 className={`text-xl font-black ${textH}`}>Signal Summary</h2>
+                                            </div>
+                                            <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+                                                <MetricGauge label="CPU" value={metrics.infra.cpu_percent} warn={80} crit={90} size="lg" />
+                                                <MetricGauge label="Memory" value={metrics.infra.memory_percent} warn={85} crit={95} size="lg" />
+                                                <MetricGauge label="Disk" value={metrics.infra.disk_percent} warn={80} crit={90} size="lg" />
+                                            </div>
                                         </div>
-                                        <MetricRow label="Memory Used" value={formatBytes(metrics.infra.memory_used_bytes)} isDark={isDark} />
-                                        <MetricRow label="Memory Total" value={formatBytes(metrics.infra.memory_total_bytes)} isDark={isDark} />
-                                        <MetricRow label="Disk Used" value={metrics.infra.disk_percent} unit="%" isDark={isDark} />
-                                        <MetricRow label="Disk Available" value={formatBytes(metrics.infra.disk_avail_bytes)} isDark={isDark} />
-                                        <MetricRow label="Network RX" value={`${formatBytes(metrics.infra.net_rx_bytes_sec)}/s`} isDark={isDark} />
-                                        <MetricRow label="Network TX" value={`${formatBytes(metrics.infra.net_tx_bytes_sec)}/s`} isDark={isDark} />
-                                        <MetricRow label="Load (1m)" value={metrics.infra.load1} isDark={isDark} />
-                                        <MetricRow label="Uptime" value={formatUptime(metrics.infra.uptime_seconds)} isDark={isDark} />
                                     </div>
 
-                                    {metrics.app && (
-                                        <div className="rounded-2xl p-6 border" style={{ background: card, borderColor: border }}>
-                                            <div className="flex items-center gap-3 mb-4">
-                                                <Activity size={22} className="text-emerald-600" />
-                                                <h2 className={`text-xl font-bold ${textH}`}>Application Layer</h2>
+                                    <div className="space-y-6 xl:col-span-5">
+                                        <div className="rounded-3xl border border-slate-700 bg-[#0f172a] p-6 shadow-[0_20px_60px_rgba(0,0,0,0.25)]">
+                                            <div className="mb-6 flex items-center gap-3">
+                                                <Cpu size={22} className="text-cyan-400" />
+                                                <h2 className={`text-xl font-black ${textH}`}>Infrastructure Metrics</h2>
                                             </div>
-                                            <MetricRow label="Requests/sec" value={metrics.app.requests_per_sec} isDark={isDark} />
-                                            <MetricRow label="Latency P50" value={metrics.app.latency_p50_ms} unit="ms" isDark={isDark} />
-                                            <MetricRow label="Latency P95" value={metrics.app.latency_p95_ms} unit="ms" isDark={isDark} />
-                                            <MetricRow label="Error Rate 5xx" value={metrics.app.error_rate_5xx} unit="%" isDark={isDark} />
+                                            <div className="space-y-3">
+                                                <MetricRow label="Memory Used" value={formatBytes(metrics.infra.memory_used_bytes)} isDark={true} />
+                                                <MetricRow label="Memory Total" value={formatBytes(metrics.infra.memory_total_bytes)} isDark={true} />
+                                                <MetricRow label="Disk Available" value={formatBytes(metrics.infra.disk_avail_bytes)} isDark={true} />
+                                                <MetricRow label="Network RX" value={`${formatBytes(metrics.infra.net_rx_bytes_sec)}/s`} isDark={true} />
+                                                <MetricRow label="Network TX" value={`${formatBytes(metrics.infra.net_tx_bytes_sec)}/s`} isDark={true} />
+                                                <MetricRow label="Load (1m)" value={metrics.infra.load1} isDark={true} />
+                                            </div>
                                         </div>
-                                    )}
 
-                                    {metrics.database && (
-                                        <div className="rounded-2xl p-6 border" style={{ background: card, borderColor: border }}>
-                                            <div className="flex items-center gap-3 mb-4">
-                                                <Database size={22} className="text-amber-600" />
-                                                <h2 className={`text-xl font-bold ${textH}`}>Database Layer</h2>
+                                        {metrics.app && (
+                                            <div className="rounded-3xl border border-slate-700 bg-[#0f172a] p-6 shadow-[0_20px_60px_rgba(0,0,0,0.25)]">
+                                                <div className="mb-4 flex items-center gap-3">
+                                                    <Activity size={22} className="text-cyan-400" />
+                                                    <h2 className={`text-xl font-black ${textH}`}>Application Layer</h2>
+                                                </div>
+                                                <div className="grid grid-cols-2 gap-3">
+                                                    <div className="rounded-2xl border border-slate-700 bg-[#111827] p-4">
+                                                        <div className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-500">Requests/sec</div>
+                                                        <div className="mt-2 text-2xl font-black text-white">{metrics.app.requests_per_sec.toFixed(2)}</div>
+                                                    </div>
+                                                    <div className="rounded-2xl border border-slate-700 bg-[#111827] p-4">
+                                                        <div className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-500">5xx Error</div>
+                                                        <div className="mt-2 text-2xl font-black text-red-400">{metrics.app.error_rate_5xx.toFixed(2)}%</div>
+                                                    </div>
+                                                </div>
+                                                <div className="mt-4 space-y-3">
+                                                    <MetricRow label="Latency P50" value={metrics.app.latency_p50_ms} unit="ms" isDark={true} />
+                                                    <MetricRow label="Latency P95" value={metrics.app.latency_p95_ms} unit="ms" isDark={true} />
+                                                    <MetricRow label="Latency P99" value={metrics.app.latency_p99_ms} unit="ms" isDark={true} />
+                                                </div>
                                             </div>
-                                            <MetricRow label="Status" value={metrics.database.up ? 'UP' : 'DOWN'} isDark={isDark} />
-                                            <MetricRow label="Connections" value={metrics.database.connections} isDark={isDark} />
-                                            <MetricRow label="Slow Queries" value={metrics.database.slow_queries} isDark={isDark} />
-                                        </div>
-                                    )}
+                                        )}
 
-                                    {metrics.redis && (
-                                        <div className="rounded-2xl p-6 border" style={{ background: card, borderColor: border }}>
-                                            <div className="flex items-center gap-3 mb-4">
-                                                <Zap size={22} className="text-pink-600" />
-                                                <h2 className={`text-xl font-bold ${textH}`}>Redis Cache</h2>
+                                        {metrics.database && (
+                                            <div className="rounded-3xl border border-slate-700 bg-[#0f172a] p-6 shadow-[0_20px_60px_rgba(0,0,0,0.25)]">
+                                                <div className="mb-4 flex items-center gap-3">
+                                                    <Database size={22} className="text-cyan-400" />
+                                                    <h2 className={`text-xl font-black ${textH}`}>Database Layer</h2>
+                                                </div>
+                                                <div className="grid grid-cols-2 gap-3">
+                                                    <div className="rounded-2xl border border-slate-700 bg-[#111827] p-4">
+                                                        <div className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-500">Status</div>
+                                                        <div className={`mt-2 text-2xl font-black ${metrics.database.up ? 'text-emerald-400' : 'text-red-400'}`}>{metrics.database.up ? 'UP' : 'DOWN'}</div>
+                                                    </div>
+                                                    <div className="rounded-2xl border border-slate-700 bg-[#111827] p-4">
+                                                        <div className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-500">Connections</div>
+                                                        <div className="mt-2 text-2xl font-black text-white">{metrics.database.connections}</div>
+                                                    </div>
+                                                </div>
+                                                <div className="mt-4">
+                                                    <MetricRow label="Slow Queries" value={metrics.database.slow_queries} isDark={true} />
+                                                </div>
                                             </div>
-                                            <MetricRow label="Status" value={metrics.redis.up ? 'UP' : 'DOWN'} isDark={isDark} />
-                                            <MetricRow label="Hit Ratio" value={metrics.redis.hit_ratio} unit="%" isDark={isDark} />
-                                            <MetricRow label="Commands/sec" value={metrics.redis.commands_sec} isDark={isDark} />
-                                        </div>
-                                    )}
+                                        )}
+
+                                        {metrics.redis && (
+                                            <div className="rounded-3xl border border-slate-700 bg-[#0f172a] p-6 shadow-[0_20px_60px_rgba(0,0,0,0.25)]">
+                                                <div className="mb-4 flex items-center gap-3">
+                                                    <Zap size={22} className="text-cyan-400" />
+                                                    <h2 className={`text-xl font-black ${textH}`}>Redis Cache</h2>
+                                                </div>
+                                                <div className="grid grid-cols-2 gap-3">
+                                                    <div className="rounded-2xl border border-slate-700 bg-[#111827] p-4">
+                                                        <div className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-500">Status</div>
+                                                        <div className={`mt-2 text-2xl font-black ${metrics.redis.up ? 'text-emerald-400' : 'text-red-400'}`}>{metrics.redis.up ? 'UP' : 'DOWN'}</div>
+                                                    </div>
+                                                    <div className="rounded-2xl border border-slate-700 bg-[#111827] p-4">
+                                                        <div className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-500">Hit Ratio</div>
+                                                        <div className="mt-2 text-2xl font-black text-white">{metrics.redis.hit_ratio.toFixed(2)}%</div>
+                                                    </div>
+                                                </div>
+                                                <div className="mt-4 space-y-3">
+                                                    <MetricRow label="Commands/sec" value={metrics.redis.commands_sec} isDark={true} />
+                                                    <MetricRow label="Evictions/sec" value={metrics.redis.evictions_sec} isDark={true} />
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
                                 </div>
                             </div>
                         </div>
