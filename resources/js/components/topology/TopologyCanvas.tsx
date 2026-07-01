@@ -15,6 +15,8 @@ import ReactFlow, {
     ReactFlowProvider,
     useReactFlow,
     NodeDragHandler,
+    reconnectEdge,
+    ConnectionMode,
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 import { Cloud, Check, Loader2, AlertTriangle } from 'lucide-react';
@@ -24,27 +26,24 @@ import StatusOverviewBar from './StatusOverviewBar';
 import type { TopologyLayout, TopologyNode, Server } from '../../types';
 import { useTopology, USE_MOCK } from '../../hooks/useInfraData';
 import { useTheme } from '../../context/ThemeContext';
+import { api } from '../../lib/api';
 
 const NODE_TYPES = { infraNode: InfraNode };
 
-function edgeStroke(sourceStatus?: string, targetStatus?: string): string {
-    if (sourceStatus === 'down') return '#dc2626';
-    if (targetStatus === 'down') return '#dc2626';
-    return '#16a34a';
+function edgeStroke(sourceStatus?: string): string {
+    return sourceStatus === 'down' ? '#ef4444' : '#16a34a';
 }
 
 function buildEdge(e: TopologyLayout['edges'][0], nodeMap: Map<string, Server>): Edge {
     const src = nodeMap.get(e.source)?.status;
-    const tgt = nodeMap.get(e.target)?.status;
-    const stroke = edgeStroke(src, tgt);
-    const isBad = src === 'down';
+    const stroke = edgeStroke(src);
 
     return {
         ...e,
         sourceHandle: e.sourceHandle,
         targetHandle: e.targetHandle,
         animated: true,
-        style: { stroke, strokeWidth: isBad ? 3 : 2.5, opacity: 1 },
+        style: { stroke, strokeWidth: 3, opacity: 1 },
         markerEnd: {
             type: MarkerType.ArrowClosed,
             color: stroke,
@@ -59,9 +58,12 @@ interface InnerProps {
     onNodeClick: (nodeId: string) => void;
     liveServers: Record<string, Partial<Server>>;
     allServers: Server[];
+    onCanvasServersChange?: (serverIds: string[]) => void;
+    pendingAddServer?: { token: number; server: Server } | null;
+    onPendingAddServerHandled?: () => void;
 }
 
-function TopologyCanvasInner({ topologyId, onNodeClick, liveServers, allServers }: InnerProps) {
+function TopologyCanvasInner({ topologyId, onNodeClick, liveServers, allServers, onCanvasServersChange, pendingAddServer, onPendingAddServerHandled }: InnerProps) {
     const { isDark } = useTheme();
     const { topology, loading, saveTopology, saveError, lastSavedAt, reload } = useTopology(topologyId);
     const { getViewport } = useReactFlow();
@@ -77,8 +79,8 @@ function TopologyCanvasInner({ topologyId, onNodeClick, liveServers, allServers 
     const loadingRef = useRef(true);
 
     useEffect(() => {
-        if (!topology) return;
         loadingRef.current = true;
+        if (!topology) return;
         const nodeMap = new Map(topology.nodes.map((n) => [n.id, n.data]));
         setNodes(
             topology.nodes.map((n) => ({
@@ -93,6 +95,10 @@ function TopologyCanvasInner({ topologyId, onNodeClick, liveServers, allServers 
         isDirty.current = false;
         setTimeout(() => { loadingRef.current = false; }, 100);
     }, [topology, isDark, setNodes, setEdges]);
+
+    useEffect(() => {
+        onCanvasServersChange?.(nodes.map((n) => n.id));
+    }, [nodes, onCanvasServersChange]);
 
     useEffect(() => {
         if (!Object.keys(liveServers).length) return;
@@ -163,12 +169,12 @@ function TopologyCanvasInner({ topologyId, onNodeClick, liveServers, allServers 
 
     const visibleNodes = useMemo(() => {
         if (!statusFilter) return nodes;
-        const isOnlineFilter = statusFilter === 'healthy';
+        const isOnlineFilter = statusFilter === 'up';
         const isDownFilter = statusFilter === 'down';
         return nodes.map((n) => ({
             ...n,
-            hidden: isOnlineFilter ? n.data.status === 'down' : isDownFilter ? n.data.status !== 'down' : false,
-            style: isOnlineFilter ? (n.data.status === 'down' ? { opacity: 0.12 } : undefined) : (isDownFilter && n.data.status !== 'down' ? { opacity: 0.12 } : undefined),
+            hidden: isOnlineFilter ? n.data.status !== 'up' : isDownFilter ? n.data.status !== 'down' : false,
+            style: isOnlineFilter ? (n.data.status !== 'up' ? { opacity: 0.12 } : undefined) : (isDownFilter && n.data.status !== 'down' ? { opacity: 0.12 } : undefined),
         }));
     }, [nodes, statusFilter]);
 
@@ -176,16 +182,18 @@ function TopologyCanvasInner({ topologyId, onNodeClick, liveServers, allServers 
 
     const onConnect = useCallback(
         (connection: Connection) => {
+            const sourceStatus = nodes.find((n) => n.id === connection.source)?.data.status;
+            const stroke = edgeStroke(sourceStatus);
             setEdges((eds) =>
                 addEdge(
                     {
                         ...connection,
                         id: `e-${connection.source}-${connection.target}-${Date.now()}`,
                         animated: true,
-                        style: { stroke: isDark ? '#64748b' : '#475569', strokeWidth: 2.5 },
+                        style: { stroke, strokeWidth: 3 },
                         markerEnd: {
                             type: MarkerType.ArrowClosed,
-                            color: isDark ? '#94a3b8' : '#64748b',
+                            color: stroke,
                         },
                     },
                     eds
@@ -194,7 +202,31 @@ function TopologyCanvasInner({ topologyId, onNodeClick, liveServers, allServers 
             isDirty.current = true;
             scheduleSave('edge_connected');
         },
-        [isDark, scheduleSave, setEdges]
+        [nodes, scheduleSave, setEdges]
+    );
+
+    const onReconnect = useCallback(
+        (oldEdge: Edge, newConnection: Connection) => {
+            const sourceStatus = nodes.find((n) => n.id === newConnection.source)?.data.status;
+            const stroke = edgeStroke(sourceStatus);
+            setEdges((eds) =>
+                reconnectEdge(
+                    {
+                        ...oldEdge,
+                        style: { ...(oldEdge.style ?? {}), stroke, strokeWidth: 3 },
+                        markerEnd: {
+                            type: MarkerType.ArrowClosed,
+                            color: stroke,
+                        },
+                    },
+                    newConnection,
+                    eds
+                )
+            );
+            isDirty.current = true;
+            scheduleSave('edge_reconnected');
+        },
+        [nodes, scheduleSave, setEdges]
     );
 
     const onNodeDragStop: NodeDragHandler = useCallback(() => {
@@ -203,40 +235,48 @@ function TopologyCanvasInner({ topologyId, onNodeClick, liveServers, allServers 
     }, [scheduleSave]);
 
     const handleAddServer = useCallback(
-        (server: Server) => {
-            if (canvasServerIds.has(server.id)) return;
+        async (server: Server) => {
+            if (canvasServerIds.has(server.id) || !topologyId) return;
             const col = nodes.length % 8;
             const row = Math.floor(nodes.length / 8);
             const pos = { x: 120 + col * 280, y: 120 + row * 210 };
-            setNodes((nds) => [
-                ...nds,
-                { id: server.id, type: 'infraNode', position: pos, data: server },
-            ]);
-            isDirty.current = true;
-            scheduleSave('node_added');
+            if (USE_MOCK) {
+                setNodes((nds) => [
+                    ...nds,
+                    { id: server.id, type: 'infraNode', position: pos, data: server },
+                ]);
+                isDirty.current = true;
+                scheduleSave('node_added');
+                return;
+            }
+
+            await api.addNodeToTopology(topologyId, server.id, pos);
+            await reload();
         },
-        [canvasServerIds, nodes.length, scheduleSave, setNodes]
+        [canvasServerIds, nodes.length, scheduleSave, setNodes, topologyId, reload]
     );
 
     useEffect(() => {
-        const handler = (event: Event) => {
-            const custom = event as CustomEvent<Server>;
-            if (!custom.detail) return;
-            handleAddServer(custom.detail);
-        };
-
-        window.addEventListener('topology:add-server', handler);
-        return () => window.removeEventListener('topology:add-server', handler);
-    }, [handleAddServer]);
+        if (!pendingAddServer) return;
+        void handleAddServer(pendingAddServer.server);
+        onPendingAddServerHandled?.();
+    }, [pendingAddServer?.token]);
 
     const handleRemoveServer = useCallback(
-        (serverId: string) => {
-            setNodes((nds) => nds.filter((n) => n.id !== serverId));
-            setEdges((eds) => eds.filter((e) => e.source !== serverId && e.target !== serverId));
-            isDirty.current = true;
-            scheduleSave('node_removed');
+        async (serverId: string) => {
+            if (!topologyId) return;
+            if (USE_MOCK) {
+                setNodes((nds) => nds.filter((n) => n.id !== serverId));
+                setEdges((eds) => eds.filter((e) => e.source !== serverId && e.target !== serverId));
+                isDirty.current = true;
+                scheduleSave('node_removed');
+                return;
+            }
+
+            await api.removeNodeFromTopology(topologyId, serverId);
+            await reload();
         },
-        [scheduleSave, setNodes, setEdges]
+        [scheduleSave, setNodes, setEdges, topologyId, reload]
     );
 
     const bgStyle = isDark
@@ -266,9 +306,16 @@ function TopologyCanvasInner({ topologyId, onNodeClick, liveServers, allServers 
                     onNodesChange={onNodesChange}
                     onEdgesChange={onEdgesChange}
                     onConnect={onConnect}
-                    onNodeClick={(_, node) => onNodeClick(node.id)}
+                    onReconnect={onReconnect}
+                    onNodeClick={(_, node) => onNodeClick(node.data.id ?? node.id)}
                     onNodeDragStop={onNodeDragStop}
+                    onEdgeDoubleClick={(_, edge) => {
+                        setEdges((eds) => eds.filter((e) => e.id !== edge.id));
+                        isDirty.current = true;
+                        scheduleSave('edge_removed');
+                    }}
                     nodeTypes={NODE_TYPES}
+                    connectionMode={ConnectionMode.Loose}
                     defaultViewport={topology?.viewport}
                     minZoom={0.05}
                     maxZoom={2.5}
@@ -341,6 +388,9 @@ interface Props {
     onNodeClick: (nodeId: string) => void;
     liveServers: Record<string, Partial<Server>>;
     allServers: Server[];
+    onCanvasServersChange?: (serverIds: string[]) => void;
+    pendingAddServer?: { token: number; server: Server } | null;
+    onPendingAddServerHandled?: () => void;
 }
 
 export default function TopologyCanvas(props: Props) {

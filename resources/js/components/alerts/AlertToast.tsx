@@ -1,29 +1,37 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { AlertTriangle, XCircle, Info, X } from 'lucide-react';
-import type { Alert } from '../../types';
+import type { AlertHistoryEvent } from '../../types';
 
-interface ToastItem extends Alert {
+interface ToastItem extends AlertHistoryEvent {
     toastId: string;
 }
 
+const REPEAT_WINDOW_MS = 60 * 60 * 1000;
+
 interface Props {
-    alerts: Alert[];
+    alerts: AlertHistoryEvent[];
 }
 
 export default function AlertToast({ alerts }: Props) {
     const [toasts, setToasts] = useState<ToastItem[]>([]);
-    const seenIds = useRef<Set<string>>(new Set());
+    const lastNotifiedAt = useRef<Map<string, number>>(new Map());
 
     useEffect(() => {
-        const newAlerts = alerts.filter(a => !seenIds.current.has(a.id));
+        const now = Date.now();
+        const newAlerts = alerts.filter((a) => {
+            const key = a.fingerprint;
+            const alertAt = new Date(a.last_seen_at).getTime();
+            const lastAt = lastNotifiedAt.current.get(key) ?? 0;
+            if (now - lastAt < REPEAT_WINDOW_MS && alertAt <= lastAt) return false;
+            lastNotifiedAt.current.set(key, now);
+            return true;
+        });
         if (newAlerts.length === 0) return;
-
-        newAlerts.forEach(a => seenIds.current.add(a.id));
 
         const newToasts: ToastItem[] = newAlerts.slice(0, 3).map(a => ({
             ...a,
-            toastId: `toast-${a.id}-${Date.now()}`,
+            toastId: `toast-${a.fingerprint}-${Date.now()}`,
         }));
 
         setToasts(prev => [...newToasts, ...prev].slice(0, 5));
@@ -34,6 +42,11 @@ export default function AlertToast({ alerts }: Props) {
                 setToasts(prev => prev.filter(x => x.toastId !== t.toastId));
             }, t.severity === 'critical' ? 8000 : 5000);
         });
+
+        const cutoff = now - REPEAT_WINDOW_MS * 2;
+        for (const [key, seenAt] of lastNotifiedAt.current.entries()) {
+            if (seenAt < cutoff) lastNotifiedAt.current.delete(key);
+        }
     }, [alerts]);
 
     const dismiss = (toastId: string) =>

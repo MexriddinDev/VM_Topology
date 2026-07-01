@@ -4,6 +4,8 @@ namespace App\Services;
 
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Cache;
+use App\Models\AlertEvent;
+use Illuminate\Support\Facades\DB;
 
 class PrometheusService
 {
@@ -578,6 +580,65 @@ class PrometheusService
         usort($alerts, fn($a, $b) => $b['severity'] === 'critical' ? 1 : -1);
 
         return $alerts;
+    }
+
+    public function syncAlertHistory(array $alerts): void
+    {
+        $now = now();
+        $seen = [];
+
+        DB::transaction(function () use ($alerts, $now, &$seen) {
+            foreach ($alerts as $alert) {
+                $fingerprint = $this->alertFingerprint($alert);
+                $seen[] = $fingerprint;
+
+                $event = AlertEvent::query()->firstOrNew([
+                    'fingerprint' => $fingerprint,
+                ]);
+
+                if (!$event->exists) {
+                    $event->first_seen_at = $now;
+                }
+
+                $event->fill([
+                    'severity' => $alert['severity'] ?? 'info',
+                    'type' => $alert['type'] ?? 'unknown',
+                    'instance' => $alert['instance'] ?? 'unknown',
+                    'message' => $alert['message'] ?? '',
+                    'value' => (float) ($alert['value'] ?? 0),
+                    'status' => 'active',
+                    'last_seen_at' => $now,
+                    'resolved_at' => null,
+                    'payload' => [
+                        ...($event->payload ?? []),
+                        ...$alert,
+                        'occurrence_count' => (($event->payload['occurrence_count'] ?? 0) + 1),
+                    ],
+                ]);
+
+                $event->save();
+            }
+
+            if (!empty($seen)) {
+                AlertEvent::query()
+                    ->where('status', 'active')
+                    ->whereNotIn('fingerprint', $seen)
+                    ->update([
+                        'status' => 'resolved',
+                        'resolved_at' => $now,
+                        'updated_at' => $now,
+                    ]);
+            }
+        });
+    }
+
+    private function alertFingerprint(array $alert): string
+    {
+        return md5(implode('|', [
+            $alert['severity'] ?? 'info',
+            $alert['type'] ?? 'unknown',
+            $alert['instance'] ?? 'unknown',
+        ]));
     }
 
     private function detectNodeType(string $job, array $labels): string

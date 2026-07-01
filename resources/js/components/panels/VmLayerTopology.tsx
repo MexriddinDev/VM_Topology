@@ -177,15 +177,24 @@ export default function VmLayerTopology({ metrics }: { metrics: ServerMetrics })
             </div>
 
             <Panel title="Network Interface (live)" icon={Network} tone="green" isDark={isDark}>
-                <TimeSeriesChart
-                    isDark={isDark}
-                    unit="/s"
-                    formatValue={(v) => formatRate(v).replace('/s', '')}
-                    series={[
-                        { label: 'Inbound (RX)', color: 'green', data: rxHist },
-                        { label: 'Outbound (TX)', color: 'cyan', data: txHist },
-                    ]}
-                />
+                <div
+                    className="rounded-2xl p-4"
+                    style={{
+                        background: isDark
+                            ? 'rgba(16,185,129,0.08)'
+                            : 'rgba(16,185,129,0.05)',
+                    }}
+                >
+                    <TimeSeriesChart
+                        isDark={isDark}
+                        unit="/s"
+                        formatValue={(v) => formatRate(v).replace('/s', '')}
+                        series={[
+                            { label: 'Inbound (RX)', color: 'green', data: rxHist },
+                            { label: 'Outbound (TX)', color: 'cyan', data: txHist },
+                        ]}
+                    />
+                </div>
             </Panel>
         </div>
     );

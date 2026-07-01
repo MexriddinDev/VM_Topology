@@ -31,4 +31,5 @@ Route::prefix('v1')->middleware(['throttle:120,1'])->group(function () {
     Route::post('/topology/save', [TopologyController::class, 'save']);
 
     Route::get('/alerts', [AlertController::class, 'index']);
+    Route::get('/alerts/history', [AlertController::class, 'history']);
 });

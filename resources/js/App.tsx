@@ -10,27 +10,29 @@ import ServerListPage from './pages/ServerListPage';
 import AlertsPage from './pages/AlertsPage';
 import AlertToast from './components/alerts/AlertToast';
 
-import { useServers, useAlerts, useTopologies } from './hooks/useInfraData';
+import { useServers, useAlerts, useAlertHistory, useTopologies } from './hooks/useInfraData';
 import { useTheme } from './context/ThemeContext';
 import { api } from './lib/api';
 
-import type { NodeStatus, VmLayer } from './types';
+import type { NodeStatus, VmLayer, Server } from './types';
 
 export default function App() {
     const [page, setPage] = useState<Page>('topology');
     const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
     const [activeTopologyId, setActiveTopologyId] = useState<number | null>(null);
+    const [canvasServerIds, setCanvasServerIds] = useState<string[]>([]);
+    const [pendingAddServer, setPendingAddServer] = useState<{ token: number; server: Server } | null>(null);
 
     const { theme, toggleTheme, isDark } = useTheme();
     const { servers } = useServers();
     const { alerts } = useAlerts();
+    const { alerts: alertHistory } = useAlertHistory({ status: 'active', range: 'all' });
     const { topologies, createTopology, deleteTopology, refresh: refreshTopologies } = useTopologies();
 
     useEffect(() => {
-        if (topologies.length && !activeTopologyId) {
-            const def = topologies.find((t) => t.is_default) ?? topologies[0];
-            setActiveTopologyId(def.id);
-        }
+        if (!topologies.length || activeTopologyId != null) return;
+        const fallback = topologies.find((t) => t.is_default) ?? topologies[0];
+        setActiveTopologyId(fallback.id);
     }, [topologies, activeTopologyId]);
 
     const liveServers = React.useMemo(() => {
@@ -55,6 +57,15 @@ export default function App() {
         if (!activeTopologyId) return;
         await api.linkTopologies(activeTopologyId, targetId, 'Linked dashboard');
         await refreshTopologies();
+    };
+
+    const queueAddServer = (server: Server) => {
+        if (page !== 'topology') setPage('topology');
+        if (!activeTopologyId && topologies.length > 0) {
+            const fallback = topologies.find((t) => t.is_default) ?? topologies[0];
+            setActiveTopologyId(fallback.id);
+        }
+        setPendingAddServer({ token: Date.now(), server });
     };
 
     const shellBg = isDark ? '#141414' : '#ebebeb';
@@ -113,22 +124,19 @@ export default function App() {
                     <TopologyDashboardBar
                         topologies={topologies}
                         activeId={activeTopologyId}
-                        onSelect={setActiveTopologyId}
+                        onSelect={(id) => setActiveTopologyId(id)}
                         onCreate={handleCreateTopology}
                         onDelete={deleteTopology}
                         onLink={handleLinkTopologies}
                         allServers={servers}
-                        canvasServerIds={new Set<string>()}
-                        onAddServer={(server) => {
-                            if (page !== 'topology') setPage('topology');
-                            window.dispatchEvent(new CustomEvent('topology:add-server', { detail: server }));
-                        }}
+                        canvasServerIds={new Set(canvasServerIds)}
+                        onAddServer={queueAddServer}
                     />
                 )}
 
                 <AnimatePresence mode="wait">
                     <motion.div
-                        key={`${page}-${activeTopologyId}`}
+                        key={page}
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
@@ -140,6 +148,9 @@ export default function App() {
                                 onNodeClick={setSelectedNodeId}
                                 liveServers={liveServers}
                                 allServers={servers}
+                                onCanvasServersChange={setCanvasServerIds}
+                                pendingAddServer={pendingAddServer}
+                                onPendingAddServerHandled={() => setPendingAddServer(null)}
                             />
                         )}
                         {page === 'servers' && <ServerListPage onServerClick={setSelectedNodeId} />}
@@ -149,7 +160,7 @@ export default function App() {
             </div>
 
             <NodeDetailPanel serverId={selectedNodeId} onClose={() => setSelectedNodeId(null)} />
-            <AlertToast alerts={alerts} />
+            <AlertToast alerts={alertHistory} />
         </div>
     );
 }

@@ -26,7 +26,7 @@ export default function DependencyMiniGraph({ server }: { server: Server }) {
     const self: DepNode = {
         label: server.name,
         icon: '🖥',
-        color: server.status === 'down' ? '#dc2626' : server.status === 'warning' ? '#d97706' : '#16a34a',
+        color: server.status === 'down' ? '#dc2626' : '#16a34a',
     };
 
     const allNodes: DepNode[] = [self, ...deps];

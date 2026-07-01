@@ -19,9 +19,9 @@ interface Props { serverId: string | null; onClose: () => void; }
 function Kpi({ label, value, tone, isDark }: { label: string; value: string; tone: keyof typeof TONE; isDark: boolean }) {
     const t = TONE[tone];
     return (
-        <div className="rounded-2xl border px-4 py-2.5 text-right" style={{ borderColor: `${t.c}40`, background: `${t.c}10` }}>
-            <div className={`text-[10px] font-bold uppercase tracking-[0.25em] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{label}</div>
-            <div className="font-mono text-lg font-black" style={{ color: t.c }}>{value}</div>
+        <div className="rounded-2xl border px-4 py-2.5 text-right" style={{ borderColor: `${t.c}70`, background: `${t.c}18`, boxShadow: `0 0 18px ${t.c}15` }}>
+            <div className={`text-[10px] font-bold uppercase tracking-[0.3em] ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{label}</div>
+            <div className="font-mono text-xl font-black" style={{ color: t.c, textShadow: `0 0 10px ${t.c}55` }}>{value}</div>
         </div>
     );
 }

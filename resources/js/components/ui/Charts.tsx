@@ -405,8 +405,16 @@ export function TimeSeriesChart({
             <svg width="100%" height={H} viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none">
                 <defs>
                     {series.map((s) => (
-                        <linearGradient key={s.label} id={`ts-${s.label.replace(/\s+/g, '')}`} x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="0%" stopColor={TONE[s.color].c} stopOpacity={0.4} />
+                        <linearGradient
+                            key={s.label}
+                            id={`ts-${s.label.replace(/\s+/g, '')}`}
+                            x1="0"
+                            y1="0"
+                            x2="0"
+                            y2="1"
+                        >
+                            <stop offset="0%" stopColor={TONE[s.color].c} stopOpacity={0.18} />
+                            <stop offset="55%" stopColor={TONE[s.color].c} stopOpacity={0.08} />
                             <stop offset="100%" stopColor={TONE[s.color].c} stopOpacity={0} />
                         </linearGradient>
                     ))}
@@ -435,8 +443,8 @@ export function TimeSeriesChart({
                         <g key={s.label}>
                             <path d={area} fill={`url(#ts-${s.label.replace(/\s+/g, '')})`} />
                             <path d={line} fill="none" stroke={TONE[s.color].c} strokeWidth={2} strokeLinecap="round"
-                                  style={{ filter: `drop-shadow(0 0 5px ${TONE[s.color].glow})` }} />
-                            <circle cx={last[0]} cy={last[1]} r={3.5} fill={TONE[s.color].c} style={{ filter: `drop-shadow(0 0 6px ${TONE[s.color].c})` }} />
+                                  style={{}}/>
+                            <circle cx={last[0]} cy={last[1]} r={3.5} fill={TONE[s.color].c} style={{}} />
                             <circle cx={last[0]} cy={last[1]} r={7} fill="none" stroke={TONE[s.color].c} strokeWidth={1} opacity={0.5}>
                                 <animate attributeName="r" values="4;9;4" dur="2s" repeatCount="indefinite" />
                                 <animate attributeName="opacity" values="0.6;0;0.6" dur="2s" repeatCount="indefinite" />

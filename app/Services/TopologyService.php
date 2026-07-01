@@ -11,6 +11,62 @@ use Illuminate\Support\Facades\DB;
 
 class TopologyService
 {
+    private function buildServerLookup(array $servers): array
+    {
+        $lookup = [
+            'id' => [],
+            'ip' => [],
+            'instance' => [],
+            'name' => [],
+        ];
+
+        foreach ($servers as $server) {
+            if (!is_array($server)) {
+                continue;
+            }
+
+            foreach (['id', 'ip', 'instance'] as $key) {
+                if (!empty($server[$key])) {
+                    $lookup[$key][(string) $server[$key]] = $server;
+                }
+            }
+
+            foreach (['name', 'hostname', 'alias'] as $key) {
+                if (!empty($server['labels'][$key])) {
+                    $lookup['name'][mb_strtolower((string) $server['labels'][$key])] = $server;
+                }
+            }
+
+            if (!empty($server['name'])) {
+                $lookup['name'][mb_strtolower((string) $server['name'])] = $server;
+            }
+        }
+
+        return $lookup;
+    }
+
+    private function resolveServer(array $lookup, string $serverId): ?array
+    {
+        if (isset($lookup['id'][$serverId])) {
+            return $lookup['id'][$serverId];
+        }
+
+        if (isset($lookup['ip'][$serverId])) {
+            return $lookup['ip'][$serverId];
+        }
+
+        if (isset($lookup['instance'][$serverId])) {
+            return $lookup['instance'][$serverId];
+        }
+
+        $key = mb_strtolower($serverId);
+        if (isset($lookup['name'][$key])) {
+            return $lookup['name'][$key];
+        }
+
+        return null;
+    }
+
     public function listAll(): array
     {
         return Topology::query()
@@ -102,13 +158,13 @@ class TopologyService
     {
         $topology->load(['nodes', 'edges', 'outgoingLinks.targetTopology']);
 
-        $serverMap = collect($servers)->keyBy('id');
+        $serverLookup = $this->buildServerLookup($servers);
 
-        $nodes = $topology->nodes->map(function (TopologyNode $node) use ($serverMap) {
-            $live = $serverMap->get($node->server_id);
+        $nodes = $topology->nodes->map(function (TopologyNode $node) use ($serverLookup) {
+            $live = $this->resolveServer($serverLookup, (string) $node->server_id);
 
             return [
-                'id'       => $node->server_id,
+                'id'       => $live['id'] ?? $node->server_id,
                 'type'     => 'infraNode',
                 'position' => [
                     'x' => $node->position_x,
@@ -116,14 +172,14 @@ class TopologyService
                 ],
                 'data'     => $live ?? [
                     'id'          => $node->server_id,
-                    'name'        => 'Unknown VM',
+                    'name'        => $node->server_id,
                     'instance'    => $node->server_id,
                     'job'         => 'node',
                     'type'        => 'vm',
-                    'status'      => 'unknown',
+                    'status'      => 'down',
                     'cpu_percent' => 0,
                     'ram_percent' => 0,
-                    'ip'          => '0.0.0.0',
+                    'ip'          => $node->server_id,
                     'port'        => 9100,
                     'labels'      => [],
                     'layers'      => ['infra'],
@@ -131,15 +187,20 @@ class TopologyService
             ];
         })->values()->all();
 
-        $edges = $topology->edges->map(fn (TopologyEdge $edge) => [
-            'id'            => $edge->id,
-            'source'        => $edge->source_server_id,
-            'target'        => $edge->target_server_id,
-            'sourceHandle'  => $edge->source_handle,
-            'targetHandle'  => $edge->target_handle,
-            'label'         => $edge->label,
-            'animated'      => $edge->animated,
-        ])->values()->all();
+        $edges = $topology->edges->map(function (TopologyEdge $edge) use ($serverLookup) {
+            $source = $this->resolveServer($serverLookup, (string) $edge->source_server_id);
+            $target = $this->resolveServer($serverLookup, (string) $edge->target_server_id);
+
+            return [
+                'id'            => $edge->id,
+                'source'        => $source['id'] ?? $edge->source_server_id,
+                'target'        => $target['id'] ?? $edge->target_server_id,
+                'sourceHandle'  => $edge->source_handle,
+                'targetHandle'  => $edge->target_handle,
+                'label'         => $edge->label,
+                'animated'      => $edge->animated,
+            ];
+        })->values()->all();
 
         $links = $topology->outgoingLinks->map(fn (TopologyLink $link) => [
             'id'                 => $link->id,

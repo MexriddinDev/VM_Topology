@@ -4,6 +4,7 @@ import type {
     TopologyLayout,
     TopologyDashboard,
     Alert,
+    AlertHistoryEvent,
     VmLayer,
 } from '../types';
 
@@ -150,6 +151,23 @@ export const api = {
 
     // Alerts
     getAlerts: () => fetchJSON<Alert[]>('/alerts'),
+    getAlertHistory: (params?: {
+        severity?: string;
+        type?: string;
+        status?: string;
+        q?: string;
+        range?: string;
+        limit?: number;
+    }) => {
+        const qs = new URLSearchParams();
+        if (params?.severity) qs.append('severity', params.severity);
+        if (params?.type) qs.append('type', params.type);
+        if (params?.status) qs.append('status', params.status);
+        if (params?.q) qs.append('q', params.q);
+        if (params?.range) qs.append('range', params.range);
+        if (params?.limit) qs.append('limit', String(params.limit));
+        return fetchJSON<AlertHistoryEvent[]>(`/alerts/history${qs.toString() ? `?${qs.toString()}` : ''}`);
+    },
 };
 
 // ─── Mock VM Specs (only used when VITE_USE_MOCK=true) ───────────────────────

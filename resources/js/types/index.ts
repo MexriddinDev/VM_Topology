@@ -81,6 +81,21 @@ export interface Alert {
     at: string;
 }
 
+export interface AlertHistoryEvent {
+    id: number;
+    fingerprint: string;
+    severity: AlertSeverity;
+    type: string;
+    instance: string;
+    message: string;
+    value: number;
+    status: 'active' | 'resolved';
+    first_seen_at: string;
+    last_seen_at: string;
+    resolved_at?: string | null;
+    occurrence_count: number;
+}
+
 export interface TopologyNode {
     id: string;
     type: string;
