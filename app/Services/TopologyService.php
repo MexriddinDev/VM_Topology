@@ -162,6 +162,25 @@ class TopologyService
 
         $nodes = $topology->nodes->map(function (TopologyNode $node) use ($serverLookup) {
             $live = $this->resolveServer($serverLookup, (string) $node->server_id);
+            $displayName = $node->display_name ?: ($live['name'] ?? $node->server_id);
+
+            $data = $live ?? [
+                'id'          => $node->server_id,
+                'name'        => $node->server_id,
+                'instance'    => $node->server_id,
+                'job'         => 'node',
+                'type'        => 'vm',
+                'status'      => 'down',
+                'cpu_percent' => 0,
+                'ram_percent' => 0,
+                'ip'          => $node->server_id,
+                'port'        => 9100,
+                'labels'      => [],
+                'layers'      => ['infra'],
+            ];
+
+            $data['name'] = $displayName;
+            $data['display_name'] = $node->display_name;
 
             return [
                 'id'       => $live['id'] ?? $node->server_id,
@@ -170,20 +189,7 @@ class TopologyService
                     'x' => $node->position_x,
                     'y' => $node->position_y,
                 ],
-                'data'     => $live ?? [
-                    'id'          => $node->server_id,
-                    'name'        => $node->server_id,
-                    'instance'    => $node->server_id,
-                    'job'         => 'node',
-                    'type'        => 'vm',
-                    'status'      => 'down',
-                    'cpu_percent' => 0,
-                    'ram_percent' => 0,
-                    'ip'          => $node->server_id,
-                    'port'        => 9100,
-                    'labels'      => [],
-                    'layers'      => ['infra'],
-                ],
+                'data'     => $data,
             ];
         })->values()->all();
 
@@ -251,6 +257,7 @@ class TopologyService
                         'server_id'   => $node['id'],
                     ],
                     [
+                        'display_name' => data_get($node, 'data.display_name'),
                         'position_x' => $node['position']['x'] ?? 0,
                         'position_y' => $node['position']['y'] ?? 0,
                     ]
@@ -282,7 +289,7 @@ class TopologyService
         });
     }
 
-    public function addNode(Topology $topology, string $serverId, array $position): TopologyNode
+    public function addNode(Topology $topology, string $serverId, array $position, ?string $displayName = null): TopologyNode
     {
         $node = TopologyNode::query()->firstOrCreate(
             [
@@ -290,13 +297,35 @@ class TopologyService
                 'server_id'   => $serverId,
             ],
             [
+                'display_name' => $displayName,
                 'position_x' => $position['x'] ?? 100,
                 'position_y' => $position['y'] ?? 100,
             ]
         );
 
+        if ($displayName !== null) {
+            $node->update(['display_name' => $displayName]);
+        }
+
         $this->logActivity($topology->id, 'node_added', 'node', $serverId, [
             'position' => $position,
+            'display_name' => $displayName,
+        ]);
+
+        return $node;
+    }
+
+    public function renameNode(Topology $topology, string $serverId, ?string $displayName): TopologyNode
+    {
+        $node = TopologyNode::query()
+            ->where('topology_id', $topology->id)
+            ->where('server_id', $serverId)
+            ->firstOrFail();
+
+        $node->update(['display_name' => $displayName]);
+
+        $this->logActivity($topology->id, 'node_renamed', 'node', $serverId, [
+            'display_name' => $displayName,
         ]);
 
         return $node;

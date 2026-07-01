@@ -63,6 +63,7 @@ export const api = {
         return data.map((s: any) => ({
             id: s.id,
             name: s.name,
+            display_name: s.display_name ?? null,
             instance: s.instance ?? `${s.ip}:9100`,
             job: s.job ?? 'node',
             type: s.type ?? 'vm',
@@ -121,11 +122,22 @@ export const api = {
     addNodeToTopology: (
         topologyId: number,
         serverId: string,
-        position: { x: number; y: number }
+        position: { x: number; y: number },
+        displayName?: string | null
     ) =>
         fetchJSON(`/topology/${topologyId}/nodes`, {
             method: 'POST',
-            body: JSON.stringify({ server_id: serverId, position }),
+            body: JSON.stringify({ server_id: serverId, position, display_name: displayName ?? null }),
+        }),
+
+    renameNodeInTopology: (
+        topologyId: number,
+        serverId: string,
+        displayName?: string | null
+    ) =>
+        fetchJSON(`/topology/${topologyId}/nodes/${encodeURIComponent(serverId)}`, {
+            method: 'PUT',
+            body: JSON.stringify({ display_name: displayName ?? null }),
         }),
 
     removeNodeFromTopology: (topologyId: number, serverId: string) =>

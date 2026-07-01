@@ -59,11 +59,13 @@ interface InnerProps {
     liveServers: Record<string, Partial<Server>>;
     allServers: Server[];
     onCanvasServersChange?: (serverIds: string[]) => void;
-    pendingAddServer?: { token: number; server: Server } | null;
+    onCanvasServerMapChange?: (serverMap: Record<string, string>) => void;
+    topologyRefreshToken?: number;
+    pendingAddServer?: { token: number; server: Server; displayName?: string | null } | null;
     onPendingAddServerHandled?: () => void;
 }
 
-function TopologyCanvasInner({ topologyId, onNodeClick, liveServers, allServers, onCanvasServersChange, pendingAddServer, onPendingAddServerHandled }: InnerProps) {
+function TopologyCanvasInner({ topologyId, onNodeClick, liveServers, allServers, onCanvasServersChange, onCanvasServerMapChange, topologyRefreshToken, pendingAddServer, onPendingAddServerHandled }: InnerProps) {
     const { isDark } = useTheme();
     const { topology, loading, saveTopology, saveError, lastSavedAt, reload } = useTopology(topologyId);
     const { getViewport } = useReactFlow();
@@ -98,7 +100,11 @@ function TopologyCanvasInner({ topologyId, onNodeClick, liveServers, allServers,
 
     useEffect(() => {
         onCanvasServersChange?.(nodes.map((n) => n.id));
-    }, [nodes, onCanvasServersChange]);
+        onCanvasServerMapChange?.(Object.fromEntries(nodes.map((n) => [
+            n.id,
+            (n.data.display_name?.trim() || n.data.name || n.data.ip || n.id),
+        ])));
+    }, [nodes, onCanvasServersChange, onCanvasServerMapChange]);
 
     useEffect(() => {
         if (!Object.keys(liveServers).length) return;
@@ -110,6 +116,12 @@ function TopologyCanvasInner({ topologyId, onNodeClick, liveServers, allServers,
             })
         );
     }, [liveServers, setNodes]);
+
+    useEffect(() => {
+        if ((topologyRefreshToken ?? 0) > 0) {
+            void reload();
+        }
+    }, [topologyRefreshToken, reload]);
 
     const buildLayout = useCallback(
         (nds: Node<Server>[], eds: Edge[]): Omit<TopologyLayout, 'topology' | 'links'> & { action?: string } => {
@@ -235,7 +247,7 @@ function TopologyCanvasInner({ topologyId, onNodeClick, liveServers, allServers,
     }, [scheduleSave]);
 
     const handleAddServer = useCallback(
-        async (server: Server) => {
+        async (server: Server, displayName?: string | null) => {
             if (canvasServerIds.has(server.id) || !topologyId) return;
             const col = nodes.length % 8;
             const row = Math.floor(nodes.length / 8);
@@ -243,14 +255,23 @@ function TopologyCanvasInner({ topologyId, onNodeClick, liveServers, allServers,
             if (USE_MOCK) {
                 setNodes((nds) => [
                     ...nds,
-                    { id: server.id, type: 'infraNode', position: pos, data: server },
+                    {
+                        id: server.id,
+                        type: 'infraNode',
+                        position: pos,
+                        data: {
+                            ...server,
+                            display_name: displayName ?? null,
+                            name: displayName?.trim() || server.name,
+                        },
+                    },
                 ]);
                 isDirty.current = true;
                 scheduleSave('node_added');
                 return;
             }
 
-            await api.addNodeToTopology(topologyId, server.id, pos);
+            await api.addNodeToTopology(topologyId, server.id, pos, displayName ?? null);
             await reload();
         },
         [canvasServerIds, nodes.length, scheduleSave, setNodes, topologyId, reload]
@@ -258,9 +279,9 @@ function TopologyCanvasInner({ topologyId, onNodeClick, liveServers, allServers,
 
     useEffect(() => {
         if (!pendingAddServer) return;
-        void handleAddServer(pendingAddServer.server);
+        void handleAddServer(pendingAddServer.server, pendingAddServer.displayName ?? null);
         onPendingAddServerHandled?.();
-    }, [pendingAddServer?.token]);
+    }, [pendingAddServer?.token, handleAddServer, onPendingAddServerHandled]);
 
     const handleRemoveServer = useCallback(
         async (serverId: string) => {
@@ -389,7 +410,9 @@ interface Props {
     liveServers: Record<string, Partial<Server>>;
     allServers: Server[];
     onCanvasServersChange?: (serverIds: string[]) => void;
-    pendingAddServer?: { token: number; server: Server } | null;
+    onCanvasServerMapChange?: (serverMap: Record<string, string>) => void;
+    topologyRefreshToken?: number;
+    pendingAddServer?: { token: number; server: Server; displayName?: string | null } | null;
     onPendingAddServerHandled?: () => void;
 }
 

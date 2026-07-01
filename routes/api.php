@@ -22,6 +22,7 @@ Route::prefix('v1')->middleware(['throttle:120,1'])->group(function () {
     Route::post('/topology/{id}/save', [TopologyController::class, 'save']);
 
     Route::post('/topology/{id}/nodes', [TopologyController::class, 'addNode']);
+    Route::put('/topology/{id}/nodes/{serverId}', [TopologyController::class, 'renameNode']);
     Route::delete('/topology/{id}/nodes/{serverId}', [TopologyController::class, 'removeNode']);
 
     Route::post('/topology/{id}/links', [TopologyController::class, 'linkDashboard']);

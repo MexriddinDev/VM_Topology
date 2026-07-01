@@ -28,6 +28,7 @@ function normalizeServer(s: any): Server {
     return {
         id: s.id,
         name: s.name,
+        display_name: s.display_name ?? null,
         instance: s.instance ?? `${s.ip}:9100`,
         job: s.job ?? 'node',
         type: s.type ?? 'vm',

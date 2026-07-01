@@ -21,7 +21,10 @@ export default function App() {
     const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
     const [activeTopologyId, setActiveTopologyId] = useState<number | null>(null);
     const [canvasServerIds, setCanvasServerIds] = useState<string[]>([]);
-    const [pendingAddServer, setPendingAddServer] = useState<{ token: number; server: Server } | null>(null);
+    const [canvasServerNames, setCanvasServerNames] = useState<Record<string, string>>({});
+    const [topologyRefreshToken, setTopologyRefreshToken] = useState(0);
+    const [pendingAddServer, setPendingAddServer] = useState<{ token: number; server: Server; displayName?: string | null } | null>(null);
+    const [nameDialog, setNameDialog] = useState<{ mode: 'add' | 'rename'; server: Server; value: string } | null>(null);
 
     const { theme, toggleTheme, isDark } = useTheme();
     const { servers } = useServers();
@@ -65,7 +68,47 @@ export default function App() {
             const fallback = topologies.find((t) => t.is_default) ?? topologies[0];
             setActiveTopologyId(fallback.id);
         }
-        setPendingAddServer({ token: Date.now(), server });
+        setNameDialog({ mode: 'add', server, value: canvasServerNames[server.id] ?? server.display_name ?? server.name });
+    };
+
+    const queueRenameServer = (server: Server) => {
+        setNameDialog({ mode: 'rename', server, value: canvasServerNames[server.id] ?? server.display_name ?? server.name });
+    };
+
+    const confirmRenameServer = async () => {
+        if (!nameDialog || !activeTopologyId) return;
+        const value = nameDialog.value.trim() || null;
+        await api.renameNodeInTopology(activeTopologyId, nameDialog.server.id, value);
+        setCanvasServerNames((prev) => ({
+            ...prev,
+            [nameDialog.server.id]: value || nameDialog.server.name,
+        }));
+        setTopologyRefreshToken((n) => n + 1);
+        setNameDialog(null);
+    };
+
+    const confirmAddServer = () => {
+        if (!nameDialog) return;
+        if (nameDialog.mode === 'add') {
+            setPendingAddServer({
+                token: Date.now(),
+                server: nameDialog.server,
+                displayName: nameDialog.value.trim() || null,
+            });
+        } else {
+            void confirmRenameServer();
+        }
+        setNameDialog(null);
+    };
+
+    const clearServerName = async (server: Server) => {
+        if (!activeTopologyId) return;
+        await api.renameNodeInTopology(activeTopologyId, server.id, null);
+        setCanvasServerNames((prev) => ({
+            ...prev,
+            [server.id]: server.name,
+        }));
+        setTopologyRefreshToken((n) => n + 1);
     };
 
     const shellBg = isDark ? '#141414' : '#ebebeb';
@@ -149,11 +192,22 @@ export default function App() {
                                 liveServers={liveServers}
                                 allServers={servers}
                                 onCanvasServersChange={setCanvasServerIds}
+                                onCanvasServerMapChange={setCanvasServerNames}
+                                topologyRefreshToken={topologyRefreshToken}
                                 pendingAddServer={pendingAddServer}
                                 onPendingAddServerHandled={() => setPendingAddServer(null)}
                             />
                         )}
-                        {page === 'servers' && <ServerListPage onServerClick={setSelectedNodeId} />}
+                        {page === 'servers' && (
+                            <ServerListPage
+                                onServerClick={setSelectedNodeId}
+                                canvasServerIds={canvasServerIds}
+                                canvasServerNames={canvasServerNames}
+                                onAddServer={queueAddServer}
+                                onRenameServer={queueRenameServer}
+                                onClearServer={clearServerName}
+                            />
+                        )}
                         {page === 'alerts' && <AlertsPage />}
                     </motion.div>
                 </AnimatePresence>
@@ -161,6 +215,40 @@ export default function App() {
 
             <NodeDetailPanel serverId={selectedNodeId} onClose={() => setSelectedNodeId(null)} />
             <AlertToast alerts={alertHistory} />
+
+            {nameDialog && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4">
+                    <div className={`w-full max-w-md rounded-2xl border p-5 shadow-2xl ${isDark ? 'border-slate-700 bg-[#0b1220] text-white' : 'border-slate-200 bg-white text-slate-900'}`}>
+                        <div className="text-sm font-black uppercase tracking-[0.24em] text-cyan-400">
+                            {nameDialog.mode === 'add' ? 'Virtualga nom berasizmi?' : 'Virtual nomini tahrirlaysizmi?'}
+                        </div>
+                        <div className={`mt-2 text-sm ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                            {nameDialog.server.name} · {nameDialog.server.ip}
+                        </div>
+                        <input
+                            autoFocus
+                            value={nameDialog.value}
+                            onChange={(e) => setNameDialog((prev) => prev ? { ...prev, value: e.target.value } : prev)}
+                            className={`mt-4 w-full rounded-xl border px-4 py-3 text-base outline-none ${isDark ? 'border-slate-700 bg-[#111827] text-white placeholder:text-slate-500' : 'border-slate-300 bg-white text-slate-900 placeholder:text-slate-400'}`}
+                            placeholder="Virtual name..."
+                        />
+                        <div className="mt-4 flex items-center justify-end gap-3">
+                            <button
+                                onClick={() => setNameDialog(null)}
+                                className={`rounded-xl border px-4 py-2 text-sm font-semibold ${isDark ? 'border-slate-700 text-slate-300 hover:bg-slate-800' : 'border-slate-300 text-slate-600 hover:bg-slate-50'}`}
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={confirmAddServer}
+                                className="rounded-xl bg-cyan-500 px-4 py-2 text-sm font-black text-[#06111f]"
+                            >
+                                {nameDialog.mode === 'add' ? 'Save' : 'Update'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

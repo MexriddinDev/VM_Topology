@@ -124,6 +124,7 @@ TopologyController extends Controller
     {
         $validated = $request->validate([
             'server_id'   => 'required|string',
+            'display_name' => 'nullable|string|max:120',
             'position.x'  => 'sometimes|numeric',
             'position.y'  => 'sometimes|numeric',
         ]);
@@ -132,8 +133,27 @@ TopologyController extends Controller
         $node     = $this->topology->addNode(
             $topology,
             $validated['server_id'],
-            $validated['position'] ?? ['x' => 200, 'y' => 200]
+            $validated['position'] ?? ['x' => 200, 'y' => 200],
+            $validated['display_name'] ?? null
         );
+
+        return response()->json([
+            'success' => true,
+            'data'    => $node,
+        ]);
+    }
+
+    /**
+     * PUT /api/v1/topology/{id}/nodes/{serverId}
+     */
+    public function renameNode(Request $request, int $id, string $serverId): JsonResponse
+    {
+        $validated = $request->validate([
+            'display_name' => 'nullable|string|max:120',
+        ]);
+
+        $topology = $this->topology->findOrDefault($id);
+        $node = $this->topology->renameNode($topology, $serverId, $validated['display_name'] ?? null);
 
         return response()->json([
             'success' => true,

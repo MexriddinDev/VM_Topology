@@ -10,6 +10,7 @@ class TopologyNode extends Model
     protected $fillable = [
         'topology_id',
         'server_id',
+        'display_name',
         'position_x',
         'position_y',
     ];

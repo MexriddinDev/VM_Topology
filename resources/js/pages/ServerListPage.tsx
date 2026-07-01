@@ -25,7 +25,16 @@ function MiniBar({ value, color }: { value: number; color: string }) {
     );
 }
 
-export default function ServerListPage({ onServerClick }: { onServerClick: (id: string) => void }) {
+interface Props {
+    onServerClick: (id: string) => void;
+    canvasServerIds: string[];
+    canvasServerNames: Record<string, string>;
+    onAddServer: (server: Server) => void;
+    onRenameServer: (server: Server) => void;
+    onClearServer: (server: Server) => void;
+}
+
+export default function ServerListPage({ onServerClick, canvasServerIds, canvasServerNames, onAddServer, onRenameServer, onClearServer }: Props) {
     const { isDark } = useTheme();
     const [search, setSearch] = useState('');
     // ✅ FIX: values now match the real NodeStatus union ('up' | 'down').
@@ -45,6 +54,7 @@ export default function ServerListPage({ onServerClick }: { onServerClick: (id: 
     const titleColor = isDark ? 'text-slate-100' : 'text-slate-900';
     const muted = isDark ? 'text-slate-400' : 'text-slate-500';
     const headBg = isDark ? 'rgba(255,255,255,0.03)' : 'rgba(15,23,42,0.03)';
+    const canvasSet = new Set(canvasServerIds);
 
     return (
         <div className="flex-1 flex flex-col h-full overflow-hidden p-6" style={{ background: shellBg }}>
@@ -84,12 +94,13 @@ export default function ServerListPage({ onServerClick }: { onServerClick: (id: 
                 <div
                     className={`grid px-4 py-3 text-[11px] font-bold uppercase tracking-[0.22em] ${muted}`}
                     style={{
-                        gridTemplateColumns: '1fr 80px 100px 130px 130px 100px',
+                        gridTemplateColumns: '1.1fr 1fr 80px 100px 130px 130px 130px',
                         background: headBg,
                         borderBottom: isDark ? '1px solid rgba(255,255,255,0.05)' : '1px solid rgba(15,23,42,0.06)',
                     }}
                 >
                     <span>Server</span>
+                    <span className="text-center">Name</span>
                     <span>Layers</span>
                     <span>Status</span>
                     <span>CPU</span>
@@ -119,7 +130,7 @@ export default function ServerListPage({ onServerClick }: { onServerClick: (id: 
                             onClick={() => onServerClick(server.id)}
                             className="group grid cursor-pointer items-center px-4 py-3 transition-all"
                             style={{
-                                gridTemplateColumns: '1fr 80px 100px 130px 130px 100px',
+                                gridTemplateColumns: '1.1fr 1fr 80px 100px 130px 130px 130px',
                                 borderBottom: isDark ? '1px solid rgba(255,255,255,0.04)' : '1px solid rgba(15,23,42,0.05)',
                             }}
                             whileHover={{ background: isDark ? 'rgba(34,197,94,0.04)' : 'rgba(59,130,246,0.05)' }}
@@ -132,6 +143,50 @@ export default function ServerListPage({ onServerClick }: { onServerClick: (id: 
                                     </div>
                                     <div className={`text-xs font-mono ${muted}`}>{server.job}</div>
                                 </div>
+                            </div>
+
+                            <div className="flex items-center justify-center min-w-0">
+                                {canvasSet.has(server.id) ? (
+                                    <div className="flex items-center gap-2">
+                                        <span className="truncate text-sm font-semibold text-emerald-400">
+                                            {canvasServerNames[server.id] ?? 'Unnamed'}
+                                        </span>
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                onRenameServer(server);
+                                            }}
+                                            className={`rounded-md border px-2 py-1 text-[10px] font-bold ${
+                                                isDark ? 'border-slate-600 text-cyan-300 hover:bg-slate-800' : 'border-slate-300 text-cyan-700 hover:bg-cyan-50'
+                                            }`}
+                                        >
+                                            Edit
+                                        </button>
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                onClearServer(server);
+                                            }}
+                                            className={`rounded-md border px-2 py-1 text-[10px] font-bold ${
+                                                isDark ? 'border-slate-600 text-red-300 hover:bg-slate-800' : 'border-slate-300 text-red-600 hover:bg-red-50'
+                                            }`}
+                                        >
+                                            Clear
+                                        </button>
+                                    </div>
+                                ) : (
+                                    <button
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            onAddServer(server);
+                                        }}
+                                        className={`rounded-lg border px-3 py-1.5 text-xs font-semibold ${
+                                            isDark ? 'border-slate-600 text-cyan-300 hover:bg-slate-800' : 'border-slate-300 text-cyan-700 hover:bg-cyan-50'
+                                        }`}
+                                    >
+                                        Add + name
+                                    </button>
+                                )}
                             </div>
 
                             <span className={`text-[11px] uppercase ${muted}`}>
@@ -147,10 +202,8 @@ export default function ServerListPage({ onServerClick }: { onServerClick: (id: 
                   {server.status}
                 </span>
                             </div>
-
                             <MiniBar value={server.cpu_percent} color="#3b82f6" />
                             <MiniBar value={server.ram_percent} color="#8b5cf6" />
-
                             <span className={`text-[11px] font-mono ${muted}`}>{server.ip}</span>
                         </motion.div>
                     ))}

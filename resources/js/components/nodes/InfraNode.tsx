@@ -141,10 +141,8 @@ function InfraNode({ data, selected }: NodeProps<VmServer>) {
     // Theme-aware colors
     const cardBg      = isDark ? '#18181b' : '#ffffff';
     const borderColor = isDark ? '#27272a' : '#e4e4e7';
-    const nameColor   = isDown
-        ? '#fb7185'
-        : '#34d399';
-    const ipColor = isDown ? '#fca5a5' : '#7dd3fc';
+    const nameColor   = isDown ? '#fb7185' : '#34d399';
+    const ipColor = isDown ? '#fca5a5' : '#93c5fd';
     const tagBg   = isDown ? '#2a1515' : '#052e1a';
     const tagText = isDown ? '#fca5a5' : '#86efac';
     const tagBorder = isDown ? '#ef444455' : '#22c55e55';
@@ -218,7 +216,7 @@ function InfraNode({ data, selected }: NodeProps<VmServer>) {
                         textOverflow:  'ellipsis',
                         letterSpacing: '0.01em',
                     }}>
-                        {data.name || data.ip || data.instance || data.id}
+                        {data.display_name?.trim() || data.name || data.ip || data.instance || data.id}
                     </span>
 
                     {/* Status badge */}
@@ -240,12 +238,12 @@ function InfraNode({ data, selected }: NodeProps<VmServer>) {
 
                 {/* ── IP address ── */}
                 <div style={{
-                    fontSize:      10,
+                    fontSize:      12,
                     fontFamily:    'ui-monospace, monospace',
                     color:          ipColor,
                     marginBottom:  8,
                     letterSpacing: '0.04em',
-                    fontWeight:    700,
+                    fontWeight:    800,
                 }}>
                 {data.ip || data.instance || data.id}
                 </div>

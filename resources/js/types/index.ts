@@ -47,6 +47,7 @@ export interface RedisMetrics {
 export interface Server {
     id: string;
     name: string;
+    display_name?: string | null;
     instance: string;
     job: string;
     type: NodeType;
