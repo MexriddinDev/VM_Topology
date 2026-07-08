@@ -59,6 +59,7 @@ export interface Server {
     labels: Record<string, string>;
     layers?: VmLayer[];
     jobs?: string[];
+    services?: string[];
 }
 
 export interface ServerMetrics {

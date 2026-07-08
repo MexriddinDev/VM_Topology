@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useId, useState } from 'react';
 
 interface Props {
     label: string;
@@ -6,6 +6,7 @@ interface Props {
 }
 
 export default function MetricSparkline({ label, color }: Props) {
+    const gradientId = useId();
     const [data, setData] = useState<number[]>(() =>
         Array.from({ length: 20 }, () => Math.random() * 80 + 10)
     );
@@ -33,18 +34,26 @@ export default function MetricSparkline({ label, color }: Props) {
     const areaD = `M 0,${height} L ${pts.join(' L ')} L ${width},${height} Z`;
 
     return (
-        <div className="bg-white/5 rounded-lg p-2.5">
+        <div className="rounded-lg border border-white/10 bg-transparent p-2.5 backdrop-blur-sm">
             <div className="text-[9px] text-white/40 uppercase tracking-wider mb-2">{label}</div>
             <svg width="100%" viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none" style={{ height: 48 }}>
                 <defs>
-                    <linearGradient id={`grad-${label}`} x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor={color} stopOpacity="0.3" />
+                    <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor={color} stopOpacity="0.34" />
+                        <stop offset="65%" stopColor={color} stopOpacity="0.12" />
                         <stop offset="100%" stopColor={color} stopOpacity="0" />
                     </linearGradient>
                 </defs>
-                <path d={areaD} fill={`url(#grad-${label})`} />
-                <path d={pathD} fill="none" stroke={color} strokeWidth="1.5" strokeLinejoin="round" />
-                {/* Latest value dot */}
+                <path d={areaD} fill={`url(#${gradientId})`} opacity="0.7" />
+                <path d={pathD} fill="none" stroke={color} strokeOpacity="0.18" strokeWidth="5" strokeLinejoin="round" />
+                <path
+                    d={pathD}
+                    fill="none"
+                    stroke={color}
+                    strokeWidth="1.8"
+                    strokeLinejoin="round"
+                    style={{ filter: `drop-shadow(0 0 6px ${color}88)` }}
+                />
                 <circle
                     cx={(data.length - 1) / (data.length - 1) * width}
                     cy={height - ((data[data.length - 1] - min) / range) * (height - 8) - 4}

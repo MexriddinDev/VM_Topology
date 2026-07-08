@@ -77,6 +77,7 @@ export const api = {
             labels: s.labels ?? {},
             layers: s.layers ?? ['infra'],
             jobs: s.jobs ?? [],
+            services: s.services ?? s.jobs ?? [],
         }));
     },
     getServerMetrics: (id: string) =>
@@ -240,6 +241,12 @@ function specToServer(spec: VmSpec): Server {
             ...spec.layers
                 .filter((l) => l !== 'infra')
                 .map((l) => (l === 'database' ? 'postgres' : l)),
+        ],
+        services: [
+            'node_exporter',
+            ...spec.layers
+                .filter((l) => l !== 'infra')
+                .map((l) => (l === 'database' ? 'postgresql' : l)),
         ],
     };
 }

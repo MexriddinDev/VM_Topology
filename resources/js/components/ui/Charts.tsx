@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useId, useState } from 'react';
 import { motion } from 'framer-motion';
 
 /* ============================================================== */
@@ -69,7 +69,12 @@ export function Panel({
     return (
         <div
             className="group relative overflow-hidden rounded-3xl border p-6 shadow-[0_20px_60px_rgba(0,0,0,0.3)] transition-shadow duration-300 hover:shadow-[0_24px_70px_rgba(0,0,0,0.4)]"
-            style={{ background: isDark ? '#0f172a' : '#ffffff', borderColor: isDark ? '#1f2937' : '#e5e7eb' }}
+            style={{
+                background: isDark
+                    ? 'linear-gradient(180deg, rgba(17,29,53,0.98) 0%, rgba(10,18,35,0.98) 100%)'
+                    : '#ffffff',
+                borderColor: isDark ? '#24324a' : '#e5e7eb',
+            }}
         >
             {/* top accent line */}
             <div
@@ -170,14 +175,14 @@ export function RingGauge({
                     </defs>
 
                     {/* background track */}
-                    <path d={trackPath} fill="none" stroke={isDark ? '#1e293b' : '#e2e8f0'} strokeWidth={sw} strokeLinecap="round" />
+                    <path d={trackPath} fill="none" stroke={isDark ? '#22324d' : '#e2e8f0'} strokeWidth={sw} strokeLinecap="round" />
 
                     {/* warn/crit threshold tick marks on the track */}
                     {!invert && warnPct < 100 && (
-                        <circle {...ringPoint(cx, cy, r, RING_START + (warnPct / 100) * RING_SWEEP)} r={2.2} fill={isDark ? '#0a0f1a' : '#fff'} />
+                        <circle {...ringPoint(cx, cy, r, RING_START + (warnPct / 100) * RING_SWEEP)} r={2.2} fill={isDark ? '#09111f' : '#fff'} />
                     )}
                     {!invert && critPct < 100 && (
-                        <circle {...ringPoint(cx, cy, r, RING_START + (critPct / 100) * RING_SWEEP)} r={2.2} fill={isDark ? '#0a0f1a' : '#fff'} />
+                        <circle {...ringPoint(cx, cy, r, RING_START + (critPct / 100) * RING_SWEEP)} r={2.2} fill={isDark ? '#09111f' : '#fff'} />
                     )}
 
                     {/* animated value fill */}
@@ -200,7 +205,7 @@ export function RingGauge({
                         <circle
                             {...ringPoint(cx, cy, r, RING_START + sweep)}
                             r={sw * 0.42}
-                            fill={isDark ? '#0a0f1a' : '#fff'}
+                            fill={isDark ? '#09111f' : '#fff'}
                             stroke={t.c}
                             strokeWidth={2.5}
                             style={{ filter: `drop-shadow(0 0 6px ${t.glow})` }}
@@ -244,7 +249,7 @@ export function MetricTile({
     return (
         <div
             className="flex items-center justify-between gap-3 rounded-2xl border px-4 py-3"
-            style={{ borderColor: isDark ? '#1e293b' : '#e2e8f0', background: isDark ? '#0b1220' : '#f8fafc' }}
+            style={{ borderColor: isDark ? '#22324d' : '#e2e8f0', background: isDark ? '#101b33' : '#f8fafc' }}
         >
             <div className="flex items-center gap-2.5 min-w-0">
                 {Icon && (
@@ -275,7 +280,7 @@ export function DonutUsage({
     return (
         <div className="flex flex-wrap items-center gap-4 sm:flex-nowrap">
             <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="shrink-0">
-                <circle cx={cx} cy={cy} r={r} fill="none" stroke={isDark ? '#1e293b' : '#e2e8f0'} strokeWidth={12} />
+                <circle cx={cx} cy={cy} r={r} fill="none" stroke={isDark ? '#22324d' : '#e2e8f0'} strokeWidth={12} />
                 <circle cx={cx} cy={cy} r={r} fill="none" stroke={color} strokeWidth={12} strokeLinecap="round"
                         strokeDasharray={`${progress} ${circumference}`} transform={`rotate(-90 ${cx} ${cy})`}
                         style={{ filter: `drop-shadow(0 0 7px ${color}99)`, transition: 'stroke-dasharray 0.6s ease' }} />
@@ -317,7 +322,7 @@ export function SegmentedBar({
                         style={
                             i < filled
                                 ? { background: color, boxShadow: `0 0 6px ${TONE[tone].glow}` }
-                                : { background: isDark ? '#1e293b' : '#e2e8f0' }
+                                : { background: isDark ? '#22324d' : '#e2e8f0' }
                         }
                     />
                 ))}
@@ -357,6 +362,7 @@ export function TimeSeriesChart({
     series: Series[]; height?: number; unit?: string;
     formatValue?: (v: number) => string; intervalSec?: number; isDark: boolean;
 }) {
+    const gradientBaseId = useId();
     const W = 600, H = height, PADL = 44, PADR = 26, PADT = 14, PADB = 22;
     const innerW = W - PADL - PADR, innerH = H - PADT - PADB;
     const fmt = formatValue ?? ((v: number) => v.toFixed(0));
@@ -407,14 +413,14 @@ export function TimeSeriesChart({
                     {series.map((s) => (
                         <linearGradient
                             key={s.label}
-                            id={`ts-${s.label.replace(/\s+/g, '')}`}
+                            id={`${gradientBaseId}-${s.label.replace(/[^a-zA-Z0-9_-]/g, '')}`}
                             x1="0"
                             y1="0"
                             x2="0"
                             y2="1"
                         >
-                            <stop offset="0%" stopColor={TONE[s.color].c} stopOpacity={0.18} />
-                            <stop offset="55%" stopColor={TONE[s.color].c} stopOpacity={0.08} />
+                            <stop offset="0%" stopColor={TONE[s.color].c} stopOpacity={0.28} />
+                            <stop offset="55%" stopColor={TONE[s.color].c} stopOpacity={0.1} />
                             <stop offset="100%" stopColor={TONE[s.color].c} stopOpacity={0} />
                         </linearGradient>
                     ))}
@@ -425,26 +431,34 @@ export function TimeSeriesChart({
                     const val = niceMax - (niceMax / gridLines) * i;
                     return (
                         <g key={i}>
-                            <line x1={PADL} y1={y} x2={W - PADR} y2={y} stroke={isDark ? '#1e293b' : '#e2e8f0'} strokeWidth={1} strokeDasharray="3 4" />
+                            <line x1={PADL} y1={y} x2={W - PADR} y2={y} stroke={isDark ? '#22324d' : '#e2e8f0'} strokeWidth={1} strokeDasharray="3 4" />
                             <text x={PADL - 6} y={y + 3} textAnchor="end" fontSize={9} fontFamily="monospace" fill={isDark ? '#475569' : '#94a3b8'}>
                                 {fmt(val)}
                             </text>
                         </g>
                     );
                 })}
-                <line x1={PADL} y1={PADT} x2={PADL} y2={PADT + innerH} stroke={isDark ? '#1e293b' : '#e2e8f0'} strokeWidth={1} />
+                <line x1={PADL} y1={PADT} x2={PADL} y2={PADT + innerH} stroke={isDark ? '#22324d' : '#e2e8f0'} strokeWidth={1} />
 
                 {series.map((s) => {
                     const pts = toPoints(s.data);
                     const line = smoothPath(pts);
                     const area = `${line} L ${pts[pts.length - 1][0].toFixed(1)} ${PADT + innerH} L ${pts[0][0].toFixed(1)} ${PADT + innerH} Z`;
                     const last = pts[pts.length - 1];
+                    const gradientId = `${gradientBaseId}-${s.label.replace(/[^a-zA-Z0-9_-]/g, '')}`;
                     return (
                         <g key={s.label}>
-                            <path d={area} fill={`url(#ts-${s.label.replace(/\s+/g, '')})`} />
-                            <path d={line} fill="none" stroke={TONE[s.color].c} strokeWidth={2} strokeLinecap="round"
-                                  style={{}}/>
-                            <circle cx={last[0]} cy={last[1]} r={3.5} fill={TONE[s.color].c} style={{}} />
+                            <path d={area} fill={`url(#${gradientId})`} opacity={0.72} />
+                            <path d={line} fill="none" stroke={TONE[s.color].c} strokeOpacity={0.16} strokeWidth={6} strokeLinecap="round" />
+                            <path
+                                d={line}
+                                fill="none"
+                                stroke={TONE[s.color].c}
+                                strokeWidth={2.4}
+                                strokeLinecap="round"
+                                style={{ filter: `drop-shadow(0 0 8px ${TONE[s.color].glow})` }}
+                            />
+                            <circle cx={last[0]} cy={last[1]} r={3.5} fill={TONE[s.color].c} style={{ filter: `drop-shadow(0 0 6px ${TONE[s.color].glow})` }} />
                             <circle cx={last[0]} cy={last[1]} r={7} fill="none" stroke={TONE[s.color].c} strokeWidth={1} opacity={0.5}>
                                 <animate attributeName="r" values="4;9;4" dur="2s" repeatCount="indefinite" />
                                 <animate attributeName="opacity" values="0.6;0;0.6" dur="2s" repeatCount="indefinite" />

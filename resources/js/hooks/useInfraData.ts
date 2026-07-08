@@ -40,6 +40,7 @@ function normalizeServer(s: any): Server {
         labels: s.labels ?? {},
         layers: s.layers ?? ['infra'],
         jobs: s.jobs ?? [],
+        services: s.services ?? s.jobs ?? [],
     };
 }
 

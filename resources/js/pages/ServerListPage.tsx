@@ -4,6 +4,7 @@ import { Search } from 'lucide-react';
 import type { Server, NodeStatus, VmLayer } from '../types';
 import { useServers } from '../hooks/useInfraData';
 import { useTheme } from '../context/ThemeContext';
+import { useI18n } from '../i18n/I18nContext';
 
 const LAYER_LABELS: Record<VmLayer, string> = {
     infra: 'OS', app: 'App', database: 'DB', redis: 'Redis',
@@ -36,6 +37,7 @@ interface Props {
 
 export default function ServerListPage({ onServerClick, canvasServerIds, canvasServerNames, onAddServer, onRenameServer, onClearServer }: Props) {
     const { isDark } = useTheme();
+    const { t } = useI18n();
     const [search, setSearch] = useState('');
     // ✅ FIX: values now match the real NodeStatus union ('up' | 'down').
     // Previously this used 'healthy', which never matched server.status
@@ -68,7 +70,7 @@ export default function ServerListPage({ onServerClick, canvasServerIds, canvasS
                     <input
                         value={search}
                         onChange={e => setSearch(e.target.value)}
-                        placeholder="Search servers..."
+                        placeholder={t('server.search')}
                         className={`w-full bg-transparent text-base outline-none ${isDark ? 'text-white placeholder-white/30' : 'text-slate-900 placeholder-slate-400'}`}
                     />
                 </div>
@@ -78,13 +80,13 @@ export default function ServerListPage({ onServerClick, canvasServerIds, canvasS
                     onChange={e => setStatusFilter(e.target.value as NodeStatus | '')}
                     className={`rounded-xl border px-4 py-3 text-base outline-none ${panelBorder} ${isDark ? 'bg-[#1a2332] text-white/70' : 'bg-white text-slate-700'}`}
                 >
-                    <option value="">All Status</option>
+                    <option value="">{t('server.allStatus')}</option>
                     <option value="up">UP</option>
                     <option value="down">Down</option>
                 </select>
 
                 <div className={`ml-auto text-base ${muted}`}>
-                    {servers.length} server{servers.length !== 1 ? 's' : ''}
+                    {servers.length} {t('header.vms')}
                 </div>
             </div>
 
@@ -99,25 +101,25 @@ export default function ServerListPage({ onServerClick, canvasServerIds, canvasS
                         borderBottom: isDark ? '1px solid rgba(255,255,255,0.05)' : '1px solid rgba(15,23,42,0.06)',
                     }}
                 >
-                    <span>Server</span>
-                    <span className="text-center">Name</span>
-                    <span>Layers</span>
-                    <span>Status</span>
-                    <span>CPU</span>
-                    <span>Memory</span>
-                    <span>IP</span>
+                    <span>{t('server.name')}</span>
+                    <span className="text-center">{t('server.name')}</span>
+                    <span>{t('server.layers')}</span>
+                    <span>{t('server.status')}</span>
+                    <span>{t('server.cpu')}</span>
+                    <span>{t('server.memory')}</span>
+                    <span>{t('server.ip')}</span>
                 </div>
 
                 <div className="overflow-y-auto h-full pb-12">
                     {loading && (
                         <div className={`flex items-center justify-center py-20 text-base ${muted}`}>
-                            Loading servers...
+                            {t('server.loading')}
                         </div>
                     )}
 
                     {!loading && servers.length === 0 && (
                         <div className={`flex items-center justify-center py-20 text-base ${muted}`}>
-                            No servers found
+                            {t('server.noFound')}
                         </div>
                     )}
 
@@ -149,7 +151,7 @@ export default function ServerListPage({ onServerClick, canvasServerIds, canvasS
                                 {canvasSet.has(server.id) ? (
                                     <div className="flex items-center gap-2">
                                         <span className="truncate text-sm font-semibold text-emerald-400">
-                                            {canvasServerNames[server.id] ?? 'Unnamed'}
+                                            {canvasServerNames[server.id] ?? t('server.unnamed')}
                                         </span>
                                         <button
                                             onClick={(e) => {
@@ -160,7 +162,7 @@ export default function ServerListPage({ onServerClick, canvasServerIds, canvasS
                                                 isDark ? 'border-slate-600 text-cyan-300 hover:bg-slate-800' : 'border-slate-300 text-cyan-700 hover:bg-cyan-50'
                                             }`}
                                         >
-                                            Edit
+                                            {t('server.edit')}
                                         </button>
                                         <button
                                             onClick={(e) => {
@@ -171,7 +173,7 @@ export default function ServerListPage({ onServerClick, canvasServerIds, canvasS
                                                 isDark ? 'border-slate-600 text-red-300 hover:bg-slate-800' : 'border-slate-300 text-red-600 hover:bg-red-50'
                                             }`}
                                         >
-                                            Clear
+                                            {t('server.clear')}
                                         </button>
                                     </div>
                                 ) : (
@@ -184,7 +186,7 @@ export default function ServerListPage({ onServerClick, canvasServerIds, canvasS
                                             isDark ? 'border-slate-600 text-cyan-300 hover:bg-slate-800' : 'border-slate-300 text-cyan-700 hover:bg-cyan-50'
                                         }`}
                                     >
-                                        Add + name
+                                        {t('server.addName')}
                                     </button>
                                 )}
                             </div>

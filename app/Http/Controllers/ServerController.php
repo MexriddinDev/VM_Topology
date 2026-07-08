@@ -69,11 +69,15 @@ class ServerController extends Controller
         }
 
         $instance = $server['instance'];
-        $layers   = $server['layers'] ?? $this->prometheus->detectVmLayers($instance);
+        $layers   = array_values(array_unique(array_merge(
+            $server['layers'] ?? ['infra'],
+            $this->prometheus->layersFromJobs($server['jobs'] ?? [])
+        )));
 
         $metrics = [
             'server'     => $server,
             'layers'     => $layers,
+            'services'   => $server['services'] ?? [],
             'infra'      => $this->prometheus->getNodeMetrics($instance),
             'app'        => in_array('app', $layers, true)
                 ? $this->prometheus->getAppMetrics($instance)

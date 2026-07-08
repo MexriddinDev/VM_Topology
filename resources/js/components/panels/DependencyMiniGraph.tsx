@@ -1,6 +1,7 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import type { Server, VmLayer } from '../../types';
+import { useI18n } from '../../i18n/I18nContext';
 
 interface DepNode {
     label: string;
@@ -10,9 +11,9 @@ interface DepNode {
 
 const LAYER_DEPS: Record<VmLayer, DepNode[]> = {
     infra:    [],
-    app:      [{ label: 'HTTP', icon: '⬡', color: '#16a34a' }],
-    database: [{ label: 'PostgreSQL', icon: '🗄', color: '#d97706' }],
-    redis:    [{ label: 'Redis', icon: '⚡', color: '#db2777' }],
+    app:      [{ label: 'topology.httpShort', icon: '⬡', color: '#16a34a' }],
+    database: [{ label: 'topology.postgres', icon: '🗄', color: '#d97706' }],
+    redis:    [{ label: 'topology.redisCacheShort', icon: '⚡', color: '#db2777' }],
 };
 
 const LAYER_ICONS: Record<VmLayer, string> = {
@@ -20,6 +21,7 @@ const LAYER_ICONS: Record<VmLayer, string> = {
 };
 
 export default function DependencyMiniGraph({ server }: { server: Server }) {
+    const { t } = useI18n();
     const layers = server.layers ?? ['infra'];
     const deps: DepNode[] = layers.flatMap((l) => LAYER_DEPS[l] ?? []);
 
@@ -56,7 +58,7 @@ export default function DependencyMiniGraph({ server }: { server: Server }) {
                             >
                                 {node.icon}
                             </div>
-                            <span className="text-[9px] opacity-50 text-center max-w-[48px] truncate">{node.label}</span>
+                            <span className="text-[9px] opacity-50 text-center max-w-[48px] truncate">{t(node.label)}</span>
                         </motion.div>
                     </React.Fragment>
                 ))}
@@ -64,7 +66,7 @@ export default function DependencyMiniGraph({ server }: { server: Server }) {
             <div className="flex gap-1 mt-2 flex-wrap">
                 {layers.map((l) => (
                     <span key={l} className="text-[8px] uppercase px-1.5 py-0.5 rounded bg-black/5 dark:bg-white/8 opacity-60">
-                        {LAYER_ICONS[l]} {l}
+                        {LAYER_ICONS[l]} {t(`topology.${l === 'infra' ? 'operatingSystem' : l === 'app' ? 'application' : l === 'database' ? 'database' : 'cache'}`)}
                     </span>
                 ))}
             </div>

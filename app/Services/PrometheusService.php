@@ -108,6 +108,69 @@ class PrometheusService
     }
 
     /**
+     * Derive VM layers from the Prometheus jobs discovered for the instance.
+     * This keeps the UI driven by the actual exporters/services present on a VM
+     * instead of forcing the same layer set everywhere.
+     *
+     * @param array<int, string> $jobs
+     * @return array<int, string>
+     */
+    public function layersFromJobs(array $jobs): array
+    {
+        $layers = ['infra'];
+
+        foreach (array_values(array_unique(array_filter(array_map('strval', $jobs)))) as $job) {
+            $jobLower = strtolower($job);
+
+            if ($jobLower === 'node' || str_contains($jobLower, 'node_exporter')) {
+                continue;
+            }
+
+            if (str_contains($jobLower, 'postgres') || str_contains($jobLower, 'mysql') || str_contains($jobLower, 'mariadb')) {
+                $layers[] = 'database';
+                continue;
+            }
+
+            if (str_contains($jobLower, 'redis')) {
+                $layers[] = 'redis';
+                continue;
+            }
+
+            $layers[] = 'app';
+        }
+
+        return array_values(array_unique($layers));
+    }
+
+    /**
+     * Build a readable list of discovered services from Prometheus target labels.
+     * Alias is preferred because it usually contains the human-friendly name
+     * (for example `haproxy` instead of `haproxy_xb`).
+     *
+     * @param array<int, array<string, mixed>> $targets
+     * @return array<int, string>
+     */
+    public function servicesFromTargets(array $targets): array
+    {
+        $services = [];
+
+        foreach ($targets as $target) {
+            $labels = $target['labels'] ?? [];
+            $job = trim((string) ($labels['job'] ?? ''));
+            $alias = trim((string) ($labels['alias'] ?? ''));
+            $name = $alias !== '' ? $alias : $job;
+
+            if ($name === '' || $name === 'node') {
+                continue;
+            }
+
+            $services[] = $name;
+        }
+
+        return array_values(array_unique($services));
+    }
+
+    /**
      * Fetch up/cpu/mem/disk/net/load/uptime for ALL instances in one shot
      * (one HTTP call per metric, not per instance). Used by buildVmList().
      *
@@ -372,10 +435,12 @@ class PrometheusService
                         'job'      => $job,
                         'labels'   => $labels,
                         'jobs'     => [$job],
+                        'services' => [$labels['alias'] ?? $job],
                         'health'   => $target['health'] ?? 'unknown',
                     ];
                 } else {
                     $byInstance[$ip]['jobs'][] = $job;
+                    $byInstance[$ip]['services'][] = $labels['alias'] ?? $job;
                     if (str_contains($jobLower, 'node') || str_contains($jobLower, 'server')) {
                         $byInstance[$ip]['instance'] = $instance;
                         $byInstance[$ip]['job']      = $job;
@@ -405,7 +470,14 @@ class PrometheusService
                 }
 
                 $infra  = $data['infra'] ?? $this->emptyNodeMetrics();
-                $layers = $data['layers'] ?? ['infra'];
+                $layers = array_values(array_unique(array_merge(
+                    $data['layers'] ?? ['infra'],
+                    $this->layersFromJobs($meta['jobs'])
+                )));
+                $services = array_values(array_unique(array_filter(array_map(
+                    fn ($service) => trim((string) $service),
+                    $meta['services'] ?? []
+                ))));
 
                 $servers[] = [
                     'id'          => md5($ip),
@@ -421,6 +493,7 @@ class PrometheusService
                     'labels'      => $labels,
                     'layers'      => $layers,
                     'jobs'        => array_values(array_unique($meta['jobs'])),
+                    'services'    => $services,
                 ];
             }
 

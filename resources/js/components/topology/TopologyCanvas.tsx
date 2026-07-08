@@ -27,6 +27,7 @@ import type { TopologyLayout, TopologyNode, Server } from '../../types';
 import { useTopology, USE_MOCK } from '../../hooks/useInfraData';
 import { useTheme } from '../../context/ThemeContext';
 import { api } from '../../lib/api';
+import { useI18n } from '../../i18n/I18nContext';
 
 const NODE_TYPES = { infraNode: InfraNode };
 
@@ -67,6 +68,7 @@ interface InnerProps {
 
 function TopologyCanvasInner({ topologyId, onNodeClick, liveServers, allServers, onCanvasServersChange, onCanvasServerMapChange, topologyRefreshToken, pendingAddServer, onPendingAddServerHandled }: InnerProps) {
     const { isDark } = useTheme();
+    const { t } = useI18n();
     const { topology, loading, saveTopology, saveError, lastSavedAt, reload } = useTopology(topologyId);
     const { getViewport } = useReactFlow();
 
@@ -375,7 +377,7 @@ function TopologyCanvasInner({ topologyId, onNodeClick, liveServers, allServers,
                             {USE_MOCK ? (
                                 <>
                                     <span className="w-2 h-2 rounded-full bg-emerald-500" />
-                                    Demo — 20 statik VM
+                                    {t('topology.demo')}
                                 </>
                             ) : (
                                 <>
@@ -384,10 +386,15 @@ function TopologyCanvasInner({ topologyId, onNodeClick, liveServers, allServers,
                                     {saveState === 'error' && <AlertTriangle size={16} className="text-red-500" />}
                                     {saveState === 'idle' && <Cloud size={16} className="opacity-50" />}
                                     <span>
-                                        {saveState === 'saving' ? 'Saving...' :
-                                         saveState === 'saved' ? 'Saved' :
-                                         saveState === 'error' ? 'Save failed' :
-                                         lastSavedAt ? `Synced ${lastSavedAt.toLocaleTimeString()}` : 'Auto-save'}
+                                        {saveState === 'saving'
+                                            ? t('topology.saving')
+                                            : saveState === 'saved'
+                                                ? t('topology.saved')
+                                                : saveState === 'error'
+                                                    ? t('topology.saveFailed')
+                                                    : lastSavedAt
+                                                        ? `${t('topology.synced')} ${lastSavedAt.toLocaleTimeString()}`
+                                                        : t('topology.autoSave')}
                                     </span>
                                 </>
                             )}

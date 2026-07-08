@@ -4,6 +4,7 @@ import { Plus, LayoutGrid, Trash2, Link2, ChevronDown, Search, Server as ServerI
 import type { TopologyDashboard } from '../../types';
 import { useTheme } from '../../context/ThemeContext';
 import type { Server } from '../../types';
+import { useI18n } from '../../i18n/I18nContext';
 
 interface Props {
     topologies: TopologyDashboard[];
@@ -29,6 +30,7 @@ export default function TopologyDashboardBar({
     onAddServer,
 }: Props) {
     const { isDark } = useTheme();
+    const { t } = useI18n();
     const [open, setOpen] = useState(false);
     const [creating, setCreating] = useState(false);
     const [newName, setNewName] = useState('');
@@ -80,7 +82,7 @@ export default function TopologyDashboardBar({
                     onClick={() => setOpen(!open)}
                     className={`flex items-center gap-2 rounded-2xl border px-4 py-2 text-sm font-semibold ${panelCls}`}
                 >
-                    {active?.name ?? 'Select topology'}
+                    {active?.name ?? t('nav.topology')}
                     <span className={`text-xs ${isDark ? 'text-white/40' : 'text-gray-400'}`}>
                         ({active?.node_count ?? 0} VMs)
                     </span>
@@ -130,7 +132,7 @@ export default function TopologyDashboardBar({
                                             value={newName}
                                             onChange={(e) => setNewName(e.target.value)}
                                             onKeyDown={(e) => e.key === 'Enter' && handleCreate()}
-                                            placeholder="Topology name..."
+                                            placeholder={t('topology.newTopology')}
                                             className={`flex-1 rounded-lg border px-2 py-1.5 text-xs outline-none ${
                                                 isDark ? 'border-slate-600 bg-[#0b1220] text-white placeholder:text-slate-500' : 'bg-white border-gray-300'
                                             }`}
@@ -144,7 +146,7 @@ export default function TopologyDashboardBar({
                                             isDark ? 'text-cyan-300 hover:bg-slate-800' : 'text-cyan-600 hover:bg-cyan-50'
                                         }`}
                                     >
-                                        <Plus size={12} /> New Topology Page
+                                        <Plus size={12} /> {t('topology.newTopologyPage')}
                                     </button>
                                 )}
                             </div>
@@ -163,7 +165,7 @@ export default function TopologyDashboardBar({
                             setSearchOpen(true);
                         }}
                         onFocus={() => setSearchOpen(true)}
-                        placeholder="Search VM by name or IP to add..."
+                        placeholder={t('topology.searchPlaceholder')}
                         className={`w-full bg-transparent text-sm outline-none placeholder:text-slate-500 ${isDark ? 'text-white' : 'text-gray-900'}`}
                     />
                 </div>
@@ -172,7 +174,7 @@ export default function TopologyDashboardBar({
                     <div className={`absolute left-0 right-0 top-full z-50 mt-2 overflow-hidden rounded-2xl border ${panelCls}`}>
                         {results.length === 0 ? (
                             <div className={`px-4 py-5 text-center text-sm ${isDark ? 'text-slate-400' : 'text-gray-500'}`}>
-                                No matching VMs found
+                                {t('topology.noMatches')}
                             </div>
                         ) : (
                             results.map((server) => (
@@ -211,9 +213,9 @@ export default function TopologyDashboardBar({
                             ? 'border-cyan-400 bg-cyan-500 text-[#06111f]'
                             : isDark ? 'border-slate-600 bg-[#111827] text-white/70 hover:bg-slate-800' : 'border-gray-200 text-gray-600 hover:bg-gray-100'
                     }`}
-                    title="Link this topology to another page"
+                    title={t('topology.linkPages')}
                 >
-                    <Link2 size={12} /> Link Pages
+                    <Link2 size={12} /> {t('topology.linkPages')}
                 </button>
             )}
 

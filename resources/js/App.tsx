@@ -9,10 +9,13 @@ import NodeDetailPanel from './components/panels/NodeDetailPanel';
 import ServerListPage from './pages/ServerListPage';
 import AlertsPage from './pages/AlertsPage';
 import AlertToast from './components/alerts/AlertToast';
+import LanguageSwitcher from './components/ui/LanguageSwitcher';
+import Logo from './components/ui/Logo';
 
 import { useServers, useAlerts, useAlertHistory, useTopologies } from './hooks/useInfraData';
 import { useTheme } from './context/ThemeContext';
 import { api } from './lib/api';
+import { useI18n } from './i18n/I18nContext';
 
 import type { NodeStatus, VmLayer, Server } from './types';
 
@@ -26,7 +29,8 @@ export default function App() {
     const [pendingAddServer, setPendingAddServer] = useState<{ token: number; server: Server; displayName?: string | null } | null>(null);
     const [nameDialog, setNameDialog] = useState<{ mode: 'add' | 'rename'; server: Server; value: string } | null>(null);
 
-    const { theme, toggleTheme, isDark } = useTheme();
+    const { toggleTheme, isDark } = useTheme();
+    const { t } = useI18n();
     const { servers } = useServers();
     const { alerts } = useAlerts();
     const { alerts: alertHistory } = useAlertHistory({ status: 'active', range: 'all' });
@@ -49,7 +53,7 @@ export default function App() {
     const downCount = servers.filter((s) => s.status === 'down').length;
     const criticalCount = alerts.filter((a) => a.severity === 'critical').length;
     const pageSubtitle =
-        page === 'topology' ? 'Visual map' : page === 'servers' ? 'VM inventory' : 'Incident feed';
+        page === 'topology' ? t('page.topologySubtitle') : page === 'servers' ? t('page.serversSubtitle') : t('page.alertsSubtitle');
 
     const handleCreateTopology = async (name: string) => {
         const created = await createTopology(name);
@@ -126,13 +130,8 @@ export default function App() {
                     className="flex items-center gap-4 flex-shrink-0 border-b px-6 py-4"
                     style={{ background: isDark ? '#0b1220' : barBg, borderColor: isDark ? '#243047' : barBorder }}
                 >
-                    <div className="flex items-center gap-3">
-                        <div className="rounded-2xl border border-cyan-400/20 bg-cyan-500/10 px-3 py-2">
-                            <div className="text-[10px] font-black uppercase tracking-[0.35em] text-cyan-400">Panel</div>
-                            <div className="mt-1 text-sm font-black text-white">
-                                {page === 'topology' ? 'Topology' : page === 'servers' ? 'Servers' : 'Alerts'}
-                            </div>
-                        </div>
+                    <div className="flex items-center gap-4">
+                        <Logo />
                         <div className="hidden text-sm text-slate-400 md:block">{pageSubtitle}</div>
                     </div>
 
@@ -150,8 +149,10 @@ export default function App() {
                         </span>
                     )}
                     <span className="rounded-2xl border border-emerald-500/30 bg-[#10251a] px-4 py-2 text-sm font-bold text-emerald-400">
-                        {servers.length} VMs
+                        {servers.length} {t('header.vms')}
                     </span>
+
+                    <LanguageSwitcher />
 
                     <button
                         onClick={toggleTheme}
@@ -220,7 +221,7 @@ export default function App() {
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4">
                     <div className={`w-full max-w-md rounded-2xl border p-5 shadow-2xl ${isDark ? 'border-slate-700 bg-[#0b1220] text-white' : 'border-slate-200 bg-white text-slate-900'}`}>
                         <div className="text-sm font-black uppercase tracking-[0.24em] text-cyan-400">
-                            {nameDialog.mode === 'add' ? 'Virtualga nom berasizmi?' : 'Virtual nomini tahrirlaysizmi?'}
+                            {nameDialog.mode === 'add' ? t('topology.namePromptAdd') : t('topology.namePromptEdit')}
                         </div>
                         <div className={`mt-2 text-sm ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
                             {nameDialog.server.name} · {nameDialog.server.ip}
@@ -230,20 +231,20 @@ export default function App() {
                             value={nameDialog.value}
                             onChange={(e) => setNameDialog((prev) => prev ? { ...prev, value: e.target.value } : prev)}
                             className={`mt-4 w-full rounded-xl border px-4 py-3 text-base outline-none ${isDark ? 'border-slate-700 bg-[#111827] text-white placeholder:text-slate-500' : 'border-slate-300 bg-white text-slate-900 placeholder:text-slate-400'}`}
-                            placeholder="Virtual name..."
+                            placeholder={t('topology.namePlaceholder')}
                         />
                         <div className="mt-4 flex items-center justify-end gap-3">
                             <button
                                 onClick={() => setNameDialog(null)}
                                 className={`rounded-xl border px-4 py-2 text-sm font-semibold ${isDark ? 'border-slate-700 text-slate-300 hover:bg-slate-800' : 'border-slate-300 text-slate-600 hover:bg-slate-50'}`}
                             >
-                                Cancel
+                                {t('topology.cancel')}
                             </button>
                             <button
                                 onClick={confirmAddServer}
                                 className="rounded-xl bg-cyan-500 px-4 py-2 text-sm font-black text-[#06111f]"
                             >
-                                {nameDialog.mode === 'add' ? 'Save' : 'Update'}
+                                {nameDialog.mode === 'add' ? t('topology.save') : t('topology.update')}
                             </button>
                         </div>
                     </div>
